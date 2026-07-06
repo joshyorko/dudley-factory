@@ -57,6 +57,28 @@ class FactoryContractTests(unittest.TestCase):
         self.assertIn("dudley-bluefin-nvidia.spdx.json", publish)
         self.assertIn("dudley-bluefin.spdx.json", check)
 
+    def test_patchraptor_replaces_inherited_bot_automation(self) -> None:
+        renovate = read(".github/renovate.json5")
+        self.assertIn("github>joshyorko/renovate-config:org-inherited-config", renovate)
+        self.assertNotIn("projectbluefin/" + "renovate-config", renovate)
+        self.assertNotIn('"baseBranchPatterns": ["testing"]', renovate)
+        self.assertNotIn('"branchPrefix": "renovate' + '/"', renovate)
+
+        workflows = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in sorted((ROOT / ".github/workflows").glob("*.yml"))
+        )
+        self.assertNotIn("MERGE" + "RAPTOR", workflows)
+        self.assertNotIn("merge" + "raptor", workflows)
+        self.assertNotIn("reusable-renovate-" + "automerge", workflows)
+        self.assertFalse((ROOT / ".github/workflows" / ("sync" + "-next-from-main.yml")).exists())
+        self.assertFalse((ROOT / ".github/workflows/track-next-junctions.yml").exists())
+        self.assertTrue((ROOT / ".github/workflows/track-bst-sources.yml").exists())
+        source_tracking = read(".github/workflows/track-bst-sources.yml")
+        self.assertIn("patchraptor/track-dsb-common-payload", source_tracking)
+        self.assertIn("bluefin-nvidia/nvidia-container-toolkit.bst", source_tracking)
+        self.assertIn("BASE_BRANCH: main", source_tracking)
+
     def test_stable_promotion_is_disabled_until_parity(self) -> None:
         execute_release = read(".github/workflows/execute-release.yml")
         self.assertIn("stable promotion is disabled", execute_release)

@@ -129,7 +129,7 @@ A workflow with `on: push: branches: [main]` that lives **only on the `next` bra
 will **never fire**. GitHub only reads workflow files from the default branch when
 evaluating push triggers.
 
-**Fix:** The sync workflow (`sync-next-from-main.yml`) must live on `main`. It then
+**Fix:** The sync workflow (`retired-next-sync.yml`) must live on `main`. It then
 fires on every `push: main` and merges main into `next`. A copy also lands on `next`
 via the sync itself (harmless — the `next` copy is never triggered).
 
@@ -153,17 +153,17 @@ gh api -X DELETE repos/<org>/<repo>/branches/next/protection/required_pull_reque
 **Fix for prod branches:** Add `github-actions` (app ID 15368) to
 `bypass_pull_request_allowances` in the branch protection settings.
 
-### 8) Renovate/mergeraptor automerge — `base_branch` must match PR target
+### 8) Renovate/Patchraptor automerge — `base_branch` must match PR target
 
 The `projectbluefin/actions` reusable `renovate-automerge` workflow uses `base_branch`
-to filter which PRs to automerge. Dakota dep PRs target `testing` (testing-first model),
+to filter which PRs to automerge. Dakota dep PRs target `main` (main-branch model),
 which matches the reusable workflow default. Do **not** override with `base_branch: main`:
 
 ```yaml
 # Correct — no base_branch override needed, default is "testing"
 jobs:
   automerge:
-    uses: projectbluefin/actions/.github/workflows/reusable-renovate-automerge.yml@<sha> # v1
+    uses: projectbluefin/actions/.github/workflows/central Patchraptor automerge.yml@<sha> # v1
     with:
       head_sha: ${{ github.event.workflow_run.head_sha }}
       # base_branch omitted — defaults to "testing", which is correct
@@ -171,7 +171,7 @@ jobs:
 
 ### 9) Excluding bot actors from `pr-autoupdate` strands their PRs
 
-If `pr-autoupdate.yml` explicitly excludes a bot actor (e.g. `app/mergeraptor`) from
+If `pr-autoupdate.yml` explicitly excludes a bot actor (e.g. `app/Patchraptor`) from
 branch-update logic, that bot's PRs accumulate `behind` status and never merge.
 Bots create PRs but do not self-update branches when the base advances.
 
@@ -212,7 +212,7 @@ git push upstream unblock:<bot-branch>
 
 Remove the empty commit branch after the PR merges.
 
-### 11) Renovate automerge fails on workflow-file bumps — use Mergeraptor token
+### 11) Renovate automerge fails on workflow-file bumps — use Patchraptor token
 
 When a Renovate PR updates an action SHA inside `.github/workflows/`, GitHub
 refuses to merge it without `workflows` permission:
@@ -230,14 +230,14 @@ actionlint rejects it with `unknown permission scope "workflows"`. This is a har
 rule in AGENTS.md. Do not add it. Do not suppress the actionlint error.
 
 **Correct fix:** The reusable `renovate-automerge.yml` in `projectbluefin/actions`
-uses the Mergeraptor GitHub App token internally, which has the `workflows` GitHub
+uses the Patchraptor GitHub App token internally, which has the `workflows` GitHub
 App permission. If workflow-file bumps are still not auto-merging, check that:
-1. `MERGERAPTOR_APP_ID` and `MERGERAPTOR_PRIVATE_KEY` secrets are set on the repo
-2. The Mergeraptor app has `workflows` permission granted in org settings
+1. `RENOVATE_APP_ID` and `RENOVATE_PRIVATE_KEY` secrets are set on the repo
+2. The Patchraptor app has `workflows` permission granted in org settings
 
-### 11b) Branch-sync workflows that push workflow files need the Mergeraptor token
+### 11b) Branch-sync workflows that push workflow files need the Patchraptor token
 
-`sync-next-from-main.yml` merges `main` into `next`. When that merge includes
+`retired-next-sync.yml` merges `main` into `next`. When that merge includes
 changes to `.github/workflows/` files, the push fails:
 
 ```
@@ -250,7 +250,7 @@ GitHub requires a token with `workflows` scope, and `workflows: write` is not
 a valid `GITHUB_TOKEN` permission (actionlint error: `unknown permission scope
 "workflows"`).
 
-**Fix:** Use the Mergeraptor GitHub App token (which has `workflows` permission
+**Fix:** Use the Patchraptor GitHub App token (which has `workflows` permission
 as an installed GitHub App) for checkout and push:
 
 ```yaml
@@ -258,14 +258,14 @@ permissions:
   contents: read  # NOT contents: write — app token handles the push
 
 jobs:
-  sync-next:
+  retired-next-sync:
     steps:
-      - name: Get mergeraptor token
+      - name: Get Patchraptor token
         id: app-token
         uses: actions/create-github-app-token@<sha> # v3
         with:
-          app-id: ${{ secrets.MERGERAPTOR_APP_ID }}
-          private-key: ${{ secrets.MERGERAPTOR_PRIVATE_KEY }}
+          app-id: ${{ secrets.RENOVATE_APP_ID }}
+          private-key: ${{ secrets.RENOVATE_PRIVATE_KEY }}
 
       - name: Checkout next
         uses: actions/checkout@<sha> # v6
@@ -283,7 +283,7 @@ This pattern is also used in `track-bst-sources.yml` and `track-next-junctions.y
 
 ### 13) ~~`execute-release` fires on CI-only main push~~ — DELETED pattern (2026-06-23)
 
-`execute-release.yml` no longer triggers on `push: main`. It now fires via `workflow_run` from `publish.yml` on `testing` only. The CI-only push trigger and the `check-trigger` commit-message gate were both removed. This bug no longer applies.
+`execute-release.yml` no longer triggers on `push: main`. It now fires via `workflow_run` from `publish.yml` on `main` only. The CI-only push trigger and the `check-trigger` commit-message gate were both removed. This bug no longer applies.
 
 ### 14) `BST_SHOW_OUT=$(cmd)` with bash -e exits on bst show failure (2026-06-23)
 
@@ -384,8 +384,8 @@ If a reusable automerge workflow matches PRs by `head_sha`, it must listen to th
 `ossf/scorecard-action` validates default-branch-only behavior for checks like
 `Branch-Protection` and fails with `validating options: only default branch is
 supported` if the workflow's `push.branches` points at a non-default branch.
-Dakota's GitHub default branch is `testing`, not `main`, so
-`.github/workflows/scorecard.yml` must use `push.branches: [testing]`.
+Dakota's GitHub default branch is `main`, not `main`, so
+`.github/workflows/scorecard.yml` must use `push.branches: [main]`.
 
 Keep the weekly `schedule` trigger (`17 9 * * 1`) intact for the `Maintained`
 check; only retarget the push branch filter to the actual default branch.
@@ -399,11 +399,11 @@ check; only retarget the push branch filter to the actual default branch.
 - relying on `GITHUB_TOKEN` for bot PRs that need PR checks to fire
 - `persist-credentials: false` in a workflow that runs in a repo with submodules
 - a sync workflow living only on the non-default branch (it will never fire)
-- `base_branch` not passed to `reusable-renovate-automerge` or passed with wrong value
+- `base_branch` not passed to `central Patchraptor automerge` or passed with wrong value
 - bot actors excluded from `pr-autoupdate` while their PRs go behind
 - `validate` job condition is `pull_request` only — blocked in merge queue for bot PRs
-- `renovate-automerge` missing Mergeraptor token — workflow-file bumps silently strand
-- `pr-triage` gate only allowing `renovate/*` to target `testing`, blocking feature PRs
+- `renovate-automerge` missing Patchraptor token — workflow-file bumps silently strand
+- `pr-triage` gate only allowing `patchraptor/*` to target `main`, blocking feature PRs
 - rapid-fire PR merges cancelling each other's pending builds (manual dispatch needed)
 - `if: ${{ inputs.X }}` in a job condition on a workflow that can be triggered by `workflow_run`
 - `with:` block in a reusable workflow call passing inputs not declared in the target workflow
@@ -419,9 +419,9 @@ check; only retarget the push branch filter to the actual default branch.
 - [ ] The fix reduces CI ambiguity instead of adding more magic
 - [ ] `persist-credentials: false` not added to repos with incomplete `.gitmodules`
 - [ ] Branch-sync workflow lives on the default branch, not on the target branch
-- [ ] `reusable-renovate-automerge` calls omit `base_branch` (default is `testing`) or pass the correct branch
+- [ ] `central Patchraptor automerge` calls omit `base_branch` (default is `main`) or pass the correct branch
 - [ ] `pr-autoupdate` has no actor exclusions that would strand bot PRs
 - [ ] `validate` job runs on both `pull_request` and `merge_group` (not just `pull_request`)
-- [ ] `renovate-automerge.yml` does NOT have `workflows: write` (invalid scope — actionlint rejects it; use Mergeraptor app token instead)
+- [ ] `renovate-automerge.yml` does NOT have `workflows: write` (invalid scope — actionlint rejects it; use Patchraptor app token instead)
 - [ ] CI-only changes that must survive sync are either landed on main directly or promoted before the next unrelated main push
 - [ ] All job `if:` conditions in dual-trigger workflows (`workflow_run` + `workflow_dispatch`) use bare expressions, not `${{ }}` wrappers

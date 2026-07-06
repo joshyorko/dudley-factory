@@ -3,8 +3,8 @@ name: Build Dudley Bluefin
 on:
   # Fires daily at 13:00 UTC — 5 hours after the gnome-build-meta nightly
   # (~08:00 UTC) to absorb nightly deltas before building.
-  # NOTE: schedule triggers run on the default branch; set testing as the
-  # default branch in repo settings for this to target testing.
+  # NOTE: schedule triggers run on the repository default branch. Dudley Factory
+  # uses main as that branch; published testing images remain stream tags.
   schedule:
     - cron: '0 13 * * *'
   workflow_dispatch:
@@ -21,22 +21,21 @@ env:
 
 jobs:
   # ── Default-branch precondition ──────────────────────────────────────────
-  # Scheduled triggers always run on the repository default branch. If the
-  # default branch is not 'testing', the daily build silently targets the
-  # wrong ref. Fail fast and loudly when that invariant is violated.
+  # Scheduled triggers always run on the repository default branch. Dudley
+  # Factory expects main so the daily build follows the landed factory source.
   verify-default-branch:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
-      - name: Verify repository default branch is 'testing'
+      - name: Verify repository default branch is main
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           db=$(gh api "repos/${GITHUB_REPOSITORY}" --jq .default_branch)
-          if [ "$db" != "testing" ]; then
-            echo "::error::default branch is '$db', expected 'testing'. Daily schedule will silently target wrong branch. Fix repo settings."
+          if [ "$db" != "main" ]; then
+            echo "::error::default branch is '$db', expected 'main'. Daily schedule will silently target wrong branch. Fix repo settings."
             exit 1
           fi
 

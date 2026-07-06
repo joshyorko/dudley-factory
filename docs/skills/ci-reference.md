@@ -52,11 +52,11 @@ Route through `ci.md` first, then come here only when the focused skills do not 
 | Build timeout | 330 min (job: 360 min) |
 | Remote cache server | `cache.projectbluefin.io:11002` |
 | Cache auth | mTLS — `CASD_CLIENT_CERT` (repo variable) + `CASD_CLIENT_KEY` (secret) |
-| Published image | `ghcr.io/projectbluefin/dakota:{testing,stable,next,btw}` and `:$SHA` |
+| Published image | `ghcr.io/joshyorko/dudley-factory:{testing,stable,next,btw}` and `:$SHA` |
 | Build logs artifact | `buildstream-logs-x86_64-<variant>` (7-day retention) |
 | Trigger (validate) | `pull_request` — `bst show --deps all`, no CAS |
 | Trigger (build) | `schedule: daily 13:00 UTC`, `merge_group`, `workflow_dispatch` (no push trigger) |
-**Nightly schedule rationale** — builds on `testing` run once a day at 13:00 UTC (after GNOME nightlies and the `next` branch build) using the CAS cache pre-warmed by `merge_group` PR runs.
+**Nightly schedule rationale** — builds on `main` run once a day at 13:00 UTC (after GNOME nightlies and the `next` branch build) using the CAS cache pre-warmed by `merge_group` PR runs.
 
 **Merge queue path:** `build` fires on `merge_group` — full OCI build, real CI gate before merge. This warms the CAS cache but does not push a public stream tag. The daily schedule does the publishing.
 
@@ -115,7 +115,7 @@ Route through `ci.md` first, then come here only when the focused skills do not 
 Before any action that could trigger a build, verify the field is clear:
 
 ```bash
-gh run list --repo projectbluefin/dakota --limit 30 \
+gh run list --repo joshyorko/dudley-factory --limit 30 \
   --json databaseId,status,name,headBranch \
   | python3 -c "
 import json, sys
@@ -124,7 +124,7 @@ active = [r for r in runs if r['status'] in ('in_progress', 'queued', 'pending',
 if active:
     print(f'BLOCKED: {len(active)} active run(s). Cancel all before proceeding:')
     for r in active:
-        print(f'  gh run cancel {r[\"databaseId\"]} --repo projectbluefin/dakota  # {r[\"name\"]} [{r[\"headBranch\"]}]')
+        print(f'  gh run cancel {r[\"databaseId\"]} --repo joshyorko/dudley-factory  # {r[\"name\"]} [{r[\"headBranch\"]}]')
 else:
     print('OK: field is clear, safe to proceed')
 "
@@ -197,7 +197,7 @@ All downstream steps are skipped. cache-warm never runs. BST CAS goes cold. Ever
 
 **Root cause:** A dangling gitlink (mode `160000`) was committed to the tree with no `.gitmodules` URL. `actions/checkout@v6` calls `git submodule foreach` for credential cleanup even with `submodules: false`, and dies on the missing URL. v7 handles it silently.
 
-**How it got in:** Promotion squash PR #937 (June 20) carried the gitlink from `testing` into `main`. Likely introduced by an agent that committed an empty directory containing a stale `.git` reference.
+**How it got in:** Promotion squash PR #937 (June 20) carried the gitlink from `main` into `main`. Likely introduced by an agent that committed an empty directory containing a stale `.git` reference.
 
 **Fix:** `git rm -f .workflow-scripts` — no `.gitmodules` file was ever present, so nothing else to clean up.
 
@@ -287,7 +287,7 @@ Treat these like `Cargo.lock` — commit the updates with your element changes.
 
 PRs created by a workflow using `GITHUB_TOKEN` do NOT fire `pull_request` events — GitHub suppresses workflow triggers from its own bot token to prevent recursive loops.
 
-**Fix:** Use a GitHub App token (mergeraptor) for `gh pr create` in `track-bst-sources.yml`.
+**Fix:** Use a GitHub App token (Patchraptor) for `gh pr create` in `track-bst-sources.yml`.
 
 ## Ruleset
 
@@ -298,7 +298,7 @@ Ruleset: `main-merge-queue-no-review` (id: 18008292)
 | Required reviews | 0 (fully automated — no human approval) |
 | Required status checks | `validate` (strict) |
 | Merge queue | SQUASH, ALLGREEN, max_entries_to_build=2, timeout=120 min |
-| Bypass actors | OrganizationAdmin, Renovate, mergeraptor |
+| Bypass actors | OrganizationAdmin, Renovate, Patchraptor |
 
 **`action_required` on promotion PR checks is expected.** The org blocks `github-actions[bot]`-triggered `pull_request` workflow runs. `validate` and all other PR checks show `action_required` on every promotion PR — this is normal and not a failure. The merge queue fires `merge_group` events which bypass the bot approval policy and run `validate` cleanly.
 
@@ -312,7 +312,7 @@ At the start of every dakota session, check GNOME OS upstream status:
 
 ```bash
 gh pr list --repo gnome/gnome-build-meta --state open --limit 10
-gh run list --repo projectbluefin/dakota --limit 5
+gh run list --repo joshyorko/dudley-factory --limit 5
 ```
 
 ## Common Rationalizations
@@ -438,14 +438,14 @@ silently produces `startup_failure` with zero job output — `jobs: []`.
 Check with:
 
 ```bash
-gh api repos/projectbluefin/dakota/actions/workflows \
+gh api repos/joshyorko/dudley-factory/actions/workflows \
   --jq '.workflows[] | "\(.id) \(.state) \(.name)"'
 ```
 
 Re-enable with:
 
 ```bash
-gh api repos/projectbluefin/dakota/actions/workflows/<id>/enable --method PUT
+gh api repos/joshyorko/dudley-factory/actions/workflows/<id>/enable --method PUT
 ```
 
 **Two confirmed causes of `startup_failure` with `jobs: []` (2026-06-04):**
@@ -469,19 +469,19 @@ branches (not main). Fix: dispatch `build.yml` on main first, wait for it to
 complete (~5–6 hours), then dispatch `publish.yml`.
 
 ```bash
-gh workflow run build.yml --repo projectbluefin/dakota --ref main
+gh workflow run build.yml --repo joshyorko/dudley-factory --ref main
 # wait for completion, then:
-gh workflow run publish.yml --repo projectbluefin/dakota
+gh workflow run publish.yml --repo joshyorko/dudley-factory
 ```
 
-### Dep updates on testing not reaching main (2026-06-04)
+### Dep updates on main not reaching main (2026-06-04)
 
-When dep-update PRs are merged directly to `testing`, `publish.yml` (which
+When dep-update PRs are merged directly to `main`, `publish.yml` (which
 builds from `main`) never sees them. Before dispatching a build or promotion,
 check the gap:
 
 ```bash
-git log --oneline upstream/main..upstream/testing -- elements/ files/ patches/
+git log --oneline upstream/main..upstream/main -- elements/ files/ patches/
 ```
 
 If commits exist, land them via a PR to `main`:
@@ -489,16 +489,16 @@ If commits exist, land them via a PR to `main`:
 ```bash
 git checkout upstream/main -b fix/land-testing-deps
 # Apply only element/files/patches diff — avoid docs/CI conflicts:
-git diff upstream/main..upstream/testing -- elements/ files/ patches/ \
+git diff upstream/main..upstream/main -- elements/ files/ patches/ \
   > /tmp/testing-deps.patch
 git apply --index /tmp/testing-deps.patch
 git commit -m "chore(deps): land testing dep updates into main"
 git push upstream fix/land-testing-deps
-gh pr create --repo projectbluefin/dakota --base main --head fix/land-testing-deps ...
+gh pr create --repo joshyorko/dudley-factory --base main --head fix/land-testing-deps ...
 ```
 
 Do **not** cherry-pick the squash commits directly — they bundle docs/CI
-changes that have already diverged between `testing` and `main`, producing
+changes that have already diverged between `main` and `main`, producing
 unresolvable conflicts in `AGENTS.md`, `CODEOWNERS`, and `docs/skills/`.
 
 ### Same e2e failure on all PRs = infrastructure, not code (2026-06-04)
@@ -509,7 +509,7 @@ code bug. The test suite tests `:testing` not the PR branch. Skip individual
 PR debugging and go straight to:
 
 ```bash
-gh run list --repo projectbluefin/dakota --workflow publish.yml --limit 10 \
+gh run list --repo joshyorko/dudley-factory --workflow publish.yml --limit 10 \
   --json databaseId,conclusion,createdAt
 ```
 
@@ -537,7 +537,7 @@ The real root cause is in the CASD log artifact:
 **Diagnosis:**
 
 ```bash
-gh run download <run-id> --repo projectbluefin/dakota \
+gh run download <run-id> --repo joshyorko/dudley-factory \
   --name buildstream-logs-x86_64-default -D /tmp/bst-logs
 cat /tmp/bst-logs/_casd/*.log | grep -E "connect|refused|ERROR" | tail -10
 ```
@@ -555,7 +555,7 @@ with an explicit post-build push step handles cache writes atomically.
 Re-trigger the build once the cache is back up:
 
 ```bash
-gh workflow run "Build Bluefin dakota" --repo projectbluefin/dakota --ref testing
+gh workflow run "Build Bluefin dakota" --repo joshyorko/dudley-factory --ref testing
 ```
 
 **Ghost-local workaround:** Does not apply — ghost's userconfig has no remote CAS
@@ -592,7 +592,7 @@ compiled without waiting for a timeout:
 
 ```bash
 # 1. Find the in-progress build and its job IDs
-gh api repos/projectbluefin/dakota/actions/runs/<run-id>/jobs | python3 -c "
+gh api repos/joshyorko/dudley-factory/actions/runs/<run-id>/jobs | python3 -c "
 import json, sys
 from datetime import datetime, timezone
 d = json.load(sys.stdin)
@@ -605,7 +605,7 @@ for job in d.get('jobs', []):
 "
 
 # 2. Fetch the live log (note: truncated at ~11K lines = first 2-5 min of dense BST output)
-gh api repos/projectbluefin/dakota/actions/jobs/<job-id>/logs > /tmp/bst-live.log
+gh api repos/joshyorko/dudley-factory/actions/jobs/<job-id>/logs > /tmp/bst-live.log
 
 # 3. Count cache hits vs elements being compiled
 grep -c "SKIPPED" /tmp/bst-live.log          # cache hits
@@ -621,7 +621,7 @@ grep "START.*Running commands" /tmp/bst-live.log | grep -oE "\[.*\]" | sort -u
 is a GitHub API limitation, not a BST issue.
 
 **To see progress monitor output mid-build:** Open the GHA UI directly:
-`https://github.com/projectbluefin/dakota/actions/runs/<run-id>` — the
+`https://github.com/joshyorko/dudley-factory/actions/runs/<run-id>` — the
 `bst-progress.py` monitor emits lines every 30 seconds in the live log stream
 viewable in browser. The API endpoint does NOT stream these.
 
@@ -677,7 +677,7 @@ No element "failed" — the build was still running. Download the logs to find w
 was active at timeout:
 
 ```bash
-gh run download <run-id> --repo projectbluefin/dakota \
+gh run download <run-id> --repo joshyorko/dudley-factory \
   --name buildstream-logs-x86_64-default -D /tmp/bst-logs
 
 # Find elements that were waiting for remote execution when the timeout hit:
@@ -728,7 +728,7 @@ a fake digest has wrong verification commands in the release notes.
 **`cert-identity-regexp` must be fully anchored:** Cosign uses `MatchString` semantics,
 so a regexp without a trailing `$` matches any URL with that prefix. Always anchor:
 ```
-^https://github\.com/projectbluefin/dakota/\.github/workflows/publish\.yml@refs/heads/(main|gh-readonly-queue/main/.+)$
+^https://github\.com/joshyorko/dudley-factory/\.github/workflows/publish\.yml@refs/heads/(main|gh-readonly-queue/main/.+)$
 ```
 
 **SBOM artifact expiry fallback:** Build artifacts expire after 30 days. For
@@ -780,7 +780,7 @@ gh run list \
 
 `publish.yml` has no branch guard on the `promote` job. A manual dispatch from a
 non-main branch flows through e2e and promotes to `:testing`, fast-forwarding the
-`testing` branch to an unmerged commit.
+`main` branch to an unmerged commit.
 
 **Fix:** Add a branch guard to the `promote` job. Since `e2e-gate` no longer
 exists (continuous build model), the guard goes directly on `promote`:
@@ -815,26 +815,26 @@ echo "STABLE_DIGEST=${STABLE_DIGEST}" >> "$GITHUB_ENV"
 ```
 
 
-Full pipeline to promote `testing` → `stable` manually:
+Full pipeline to promote `main` → `stable` manually:
 
 ```bash
 # 1. Check for testing-only element commits not yet in main
 git fetch upstream
-git log --oneline upstream/main..upstream/testing -- elements/ files/ patches/
-# If any: land them via PR (see "Dep updates on testing not reaching main" above)
+git log --oneline upstream/main..upstream/main -- elements/ files/ patches/
+# If any: land them via PR (see "Dep updates on main not reaching main" above)
 
 # 2. Ensure publish.yml is enabled
-gh api repos/projectbluefin/dakota/actions/workflows \
+gh api repos/joshyorko/dudley-factory/actions/workflows \
   --jq '.workflows[] | select(.name | contains("Publish")) | "\(.id) \(.state)"'
 
 # 3. Dispatch publish.yml to build :testing from current main
-gh workflow run publish.yml --repo projectbluefin/dakota
+gh workflow run publish.yml --repo joshyorko/dudley-factory
 
 # 4. Once publish completes, dispatch promotion (pauses for production environment approval)
-gh workflow run weekly-testing-promotion.yml --repo projectbluefin/dakota
+gh workflow run weekly-testing-promotion.yml --repo joshyorko/dudley-factory
 ```
 
-Step 4 requires approval at: https://github.com/projectbluefin/dakota/deployments
+Step 4 requires approval at: https://github.com/joshyorko/dudley-factory/deployments
 
 The GitHub release (notes + card + SBOM) is created automatically by
 `release.yml` after every successful `publish.yml` run — no manual step needed.
@@ -858,21 +858,21 @@ changed.
 
 ```bash
 # Confirm revision matches dakota:stable
-skopeo inspect docker://ghcr.io/projectbluefin/dakota:stable \
+skopeo inspect docker://ghcr.io/joshyorko/dudley-factory:stable \
   | jq '.Labels["org.opencontainers.image.revision"]'
-skopeo inspect docker://ghcr.io/projectbluefin/dakota-nvidia:testing \
+skopeo inspect docker://ghcr.io/joshyorko/dudley-factory-nvidia:testing \
   | jq '.Labels["org.opencontainers.image.revision"]'
 
 # Get the testing digest
-DIGEST=$(skopeo inspect docker://ghcr.io/projectbluefin/dakota-nvidia:testing \
+DIGEST=$(skopeo inspect docker://ghcr.io/joshyorko/dudley-factory-nvidia:testing \
   | jq -r '.Digest')
 
 # Copy to :stable (login with gh auth token first)
 GH_TOKEN=$(gh auth token)
 skopeo login ghcr.io --username <your-user> --password "$GH_TOKEN"
 skopeo copy \
-  "docker://ghcr.io/projectbluefin/dakota-nvidia@${DIGEST}" \
-  "docker://ghcr.io/projectbluefin/dakota-nvidia:stable"
+  "docker://ghcr.io/joshyorko/dudley-factory-nvidia@${DIGEST}" \
+  "docker://ghcr.io/joshyorko/dudley-factory-nvidia:stable"
 ```
 
 **Underlying bug:** `check-diff` should also detect missing variant stable tags
@@ -900,7 +900,7 @@ Both fail, causing the step to fail even though nothing needed updating.
 CURRENT_SHA=$(gh api repos/${{ github.repository }}/git/refs/heads/testing \
   --jq .object.sha 2>/dev/null || echo "")
 if [ "$CURRENT_SHA" = "$BUILD_SHA" ]; then
-  echo "testing branch already at $BUILD_SHA — nothing to do"
+  echo "main branch already at $BUILD_SHA — nothing to do"
 elif [ -z "$CURRENT_SHA" ]; then
   gh api repos/${{ github.repository }}/git/refs --method POST \
     --field ref="refs/heads/testing" --field sha="$BUILD_SHA"
@@ -972,7 +972,7 @@ the entire GNOME stack — ~700+ elements. This exceeds the 330-minute GHA timeo
 where the previous one left off:
 
 ```bash
-gh workflow run build.yml --repo projectbluefin/dakota --ref next
+gh workflow run build.yml --repo joshyorko/dudley-factory --ref next
 ```
 
 Typically takes 2–3 runs to warm the full cache. Subsequent builds (after
@@ -1013,25 +1013,25 @@ On days where gnome-build-meta `master` does not advance, **no build fires**.
 For a guaranteed nightly, a `schedule:` trigger on `next` is needed in
 `build.yml`. This is a known gap — track it if builds go stale.
 
-### publish.yml must include testing branch in workflow_run.branches (2026-06-10)
+### publish.yml must include main branch in workflow_run.branches (2026-06-10)
 
 `publish.yml` originally only listed `main`, `gh-readonly-queue/main/**`, `next`,
 and `gh-readonly-queue/next/**` in `workflow_run.branches`. Auto-merge tracking
-PRs target `testing` — their builds completed successfully but no image was ever
-published. `promote-testing-to-main.yml` fires on `push: branches: [testing]` and
+PRs target `main` — their builds completed successfully but no image was ever
+published. `promote-testing-to-main.yml` fires on `push: branches: [main]` and
 immediately does `skopeo inspect dakota:testing`, which silently failed every time
 testing advanced without a prior main publish.
 
-**Fix (PR 766):** add `testing` and `gh-readonly-queue/testing/**` to the
+**Fix (PR 766):** add `main` and `gh-readonly-queue/main/**` to the
 `workflow_run.branches` filter, extend the `setup` job `if` condition, and map
-`testing` branch → `testing_tag=testing`. Match bluefin/bluefin-lts: testing pushes publish `:testing`.
+`main` branch → `testing_tag=testing`. Match bluefin/bluefin-lts: testing pushes publish `:testing`.
 
 ### track-bst-sources: branch from origin/$BASE_BRANCH, not origin/main (2026-06-10)
 
 `track-bst-sources.yml` created auto-merge tracking branches from `origin/main`
-but targeted `testing`. When main and testing had diverged on workflow files, the
+but targeted `main`. When main and testing had diverged on workflow files, the
 PR diff included those CI changes in reverse — the PR appeared to be deleting
-them. PR 764 had 18 commits and would have removed `testing` from `build.yml`
+them. PR 764 had 18 commits and would have removed `main` from `build.yml`
 triggers and deleted `renovate-automerge.yml`. It was closed as a corrupted PR.
 
 **Corrupted auto-track PR anatomy:** CONFLICTING state, 10+ commits, diff shows
@@ -1150,12 +1150,12 @@ jobs are skipped — no `startup_failure`.
 ### CODEOWNERS: no-owner override for auto-managed files (2026-06-11)
 
 Files auto-managed by a bot (e.g. `elements/bluefin/common.bst` bumped by
-mergeraptor on every common release) should not trigger code-owner review
+Patchraptor on every common release) should not trigger code-owner review
 requests. Add a no-owner line for the specific file **above** the catch-all
 path rule — CODEOWNERS is evaluated top-to-bottom and the first match wins:
 
 ```
-# Auto-managed by mergeraptor — no review required
+# Auto-managed by Patchraptor — no review required
 elements/bluefin/common.bst
 
 # Everything else in elements/ needs a maintainer review
@@ -1385,35 +1385,35 @@ SHAs. Prefer the version that uses managed tags internally — those age better.
 ### How the cycle works
 
 ```
-Renovate PR → testing branch (automerges when build CI passes)
-    → push to testing → build/publish updates :testing
+Renovate PR → main branch (automerges when build CI passes)
+    → push to main → build/publish updates :testing
     → promote-testing-to-main updates auto/promote-testing-to-main → main
     → maintainer merges
     → execute-release fires (commit msg "ci: promote testing images to stable")
     → :testing retagged as :stable
-    → next testing-first cycle begins
+    → next main-branch cycle begins
 ```
 
 ### Three invariants that must all hold
 
 1. **`baseBranchPatterns: ["testing"]`** in `renovate.json5` — Renovate must target
-   `testing`, not `main`. With `baseBranchPatterns: ["main"]`, `testing` stops being
-   the source of truth for content changes and the testing-first promotion loop
+   `main`, not `main`. With `baseBranchPatterns: ["main"]`, `main` stops being
+   the source of truth for content changes and the main-branch promotion loop
    starves.
 
-2. **Content PRs land on `testing`; `main` only receives promotion commits.** The
-   promotion workflow compares `testing` directly to `main`. Dakota does not rely on
+2. **Content PRs land on `main`; `main` only receives promotion commits.** The
+   promotion workflow compares `main` directly to `main`. Dakota does not rely on
    a post-promotion `main → testing` fast-forward as part of the steady-state model.
 
-3. **`pr-triage.yml` must exempt `renovate/*` PRs targeting `testing`** — the triage
-   workflow must allow the bot flow that feeds `testing`, or Renovate stalls before
+3. **`pr-triage.yml` must exempt `patchraptor/*` PRs targeting `main`** — the triage
+   workflow must allow the bot flow that feeds `main`, or Renovate stalls before
    the promotion loop even starts.
 
 ### The empty-squash crash (known bug in reusable-promote-squash)
 
-When the promotion workflow runs with no staged tree difference between `testing`
+When the promotion workflow runs with no staged tree difference between `main`
 and `main`:
-- `git merge --squash origin/testing` says "Already up to date"
+- `git merge --squash origin/main` says "Already up to date"
 - Nothing is staged
 - `git commit` exits 1 → job fails with misleading error
 
@@ -1424,8 +1424,8 @@ than failing on an empty squash.
 ### Root cause of 2026-06-11/12 breakage
 
 PR #741 changed `baseBranchPatterns` from `["testing"]` to `["main"]` to work around
-the triage gate. That bypassed Dakota's testing-first feed:
-- Renovate stopped feeding `testing` (wrong base branch)
+the triage gate. That bypassed Dakota's main-branch feed:
+- Renovate stopped feeding `main` (wrong base branch)
 - the promotion loop stopped seeing fresh testing commits
 - no-op promote runs crashed on the empty-squash bug
 - `:stable` stopped updating
@@ -1444,8 +1444,8 @@ GraphQL: Pull request Protected branch rules not configured for this branch
         (enablePullRequestAutoMerge)
 ```
 
-`testing` has no branch protection by design. Any automerge workflow targeting
-`testing` with `--auto` will always fail. The fix (applied in `projectbluefin/actions`
+`main` has no branch protection by design. Any automerge workflow targeting
+`main` with `--auto` will always fail. The fix (applied in `projectbluefin/actions`
 `renovate-automerge.yml` `@v1`) is to drop `--auto` entirely — CI success is
 already guaranteed by the `workflow_run` trigger condition.
 
@@ -1465,11 +1465,11 @@ When a workflow has `on: workflow_run`, GitHub runs it from the **repository's
 default branch** — not from the branch that triggered the upstream workflow run.
 
 **Consequence for automerge fixes:** if `renovate-automerge.yml` is fixed on a
-feature branch or `testing` but the fix hasn't landed on `main` (the default
+feature branch or `main` but the fix hasn't landed on `main` (the default
 branch), every new `workflow_run` trigger still runs the old broken version from
 `main`. The fix takes effect only when it merges to `main`.
 
-**Implication:** fixes to `workflow_run`-triggered workflows that land on `testing`
+**Implication:** fixes to `workflow_run`-triggered workflows that land on `main`
 (via a Renovate-style staging flow) are effectively inert until the promote PR
 merges them to `main`.
 
@@ -1483,7 +1483,7 @@ counter-productive and was the root cause of the June 13 automerge outage:
   intermediate SHAs, all carrying the broken `--auto`
 - Fixes require N separate Renovate bump PRs — one per consumer — each
   lagging by hours or days
-- `main` and `testing` diverged to different SHAs, creating split-brain
+- `main` and `main` diverged to different SHAs, creating split-brain
 
 **AGENTS.md already states the policy:**
 > `projectbluefin/` refs (`@v1`, `@main`) are intentional managed tags and are exempted.
@@ -1506,17 +1506,17 @@ future `projectbluefin/.*@<sha>` commits.
 **External actions** (`actions/checkout`, `taiki-e/install-action`, etc.) remain
 SHA-pinned — that policy is unchanged and correct.
 
-### build.yml push trigger must include `testing` for `:testing` images (2026-06-13)
+### build.yml push trigger must include `main` for `:testing` images (2026-06-13)
 
-`build.yml` had `push: branches: [main, next]` — `testing` was missing.
-`publish.yml` already listed `testing` in its `workflow_run.branches` filter
-and had logic to publish `:testing` on testing-branch builds, but that path
-was dead because `build.yml` never triggered on push to `testing`.
+`build.yml` had `push: branches: [main, next]` — `main` was missing.
+`publish.yml` already listed `main` in its `workflow_run.branches` filter
+and had logic to publish `:testing` on main-branch builds, but that path
+was dead because `build.yml` never triggered on push to `main`.
 
-**Result:** `:testing` images were never updated by Renovate merges to testing.
+**Result:** `:testing` images were never updated by Renovate merges to main.
 The promote PR was always building from stale image content.
 
-**Fix (PR #830):** add `testing` to `build.yml`'s push trigger. The build job
+**Fix (PR #830):** add `main` to `build.yml`'s push trigger. The build job
 runs on `event_name != 'pull_request'`, so push-to-testing fires the full build.
 BST artifact cache steps remain gated on `merge_group || schedule || workflow_dispatch`
 (intentional quota management) — they skip for plain pushes, which is fine.
@@ -1605,7 +1605,7 @@ to timeout at 360 min. Daily warming caps the cold window at 1 day.
 
 ### Promotion PR: force-push dismisses approvals even when diff is unchanged (2026-06-13)
 
-When `testing` advances (e.g. Renovate merges) while a promotion PR has a
+When `main` advances (e.g. Renovate merges) while a promotion PR has a
 maintainer approval, the promote workflow was rebuilding the squash branch
 and force-pushing — even though the effective diff against `main` was
 identical. GitHub dismisses approvals on **any** force-push regardless of
@@ -1825,22 +1825,22 @@ Mount p3 to find the ostree deployment directory.
 
 ### Legacy `Sync main → testing` divergence failure (historical runs only) (2026-06-14)
 
-Dakota's testing-first model no longer treats `sync-main-to-testing` as an active
+Dakota's main-branch model no longer treats `sync-main-to-testing` as an active
 pipeline requirement. If you are reading old workflow runs that still used the
 legacy branch-sync path, this was the failure mode:
 
-`reusable-sync-branches.yml` used `git merge`. When `testing` had commits that
+`reusable-sync-branches.yml` used `git merge`. When `main` had commits that
 `main` did not, the merge exited 1 and every subsequent push to `main` retriggered
-the same failure until a human reset `testing`.
+the same failure until a human reset `main`.
 
 **How divergence happened in that legacy model:** content PRs and Renovate both fed
-`testing`, while `main` only moved via promotion commits. A blind `main → testing`
+`main`, while `main` only moved via promotion commits. A blind `main → testing`
 merge could not recover once histories diverged on the same paths.
 
 **Emergency reset used on those historical runs:**
 ```bash
-MAIN_SHA=$(gh api repos/projectbluefin/dakota/branches/main --jq '.commit.sha')
-gh api repos/projectbluefin/dakota/git/refs/heads/testing \
+MAIN_SHA=$(gh api repos/joshyorko/dudley-factory/branches/main --jq '.commit.sha')
+gh api repos/joshyorko/dudley-factory/git/refs/heads/testing \
   -X PATCH --field sha="$MAIN_SHA" --field force=true
 ```
 
@@ -1848,7 +1848,7 @@ gh api repos/projectbluefin/dakota/git/refs/heads/testing \
 `ahead > 0` detection to `reusable-sync-branches.yml` so legacy branch-sync users
 could force-reset instead of merge:
 ```bash
-AHEAD=$(git rev-list --count "origin/main..origin/testing")
+AHEAD=$(git rev-list --count "origin/main..origin/main")
 if [ "$AHEAD" -gt 0 ]; then
   git reset --hard origin/main && git push --force origin testing
 else
@@ -1861,10 +1861,10 @@ Renovate recreated automatically.
 **Diagnosis commands for old runs only:**
 ```bash
 # Check branch status
-gh api repos/projectbluefin/dakota/compare/testing...main \
+gh api repos/joshyorko/dudley-factory/compare/testing...main \
   --jq '{ahead_by:.ahead_by, behind_by:.behind_by, status:.status}'
 # List last sync run results
-gh run list --repo projectbluefin/dakota \
+gh run list --repo joshyorko/dudley-factory \
   --workflow 'Sync main → testing' --limit 5 \
   --json conclusion,displayTitle --jq '.[] | "\(.conclusion) \(.displayTitle[:50])"'
 ```
@@ -1878,15 +1878,15 @@ PRs sat approved indefinitely.
 **Fixed in PR #858:**
 1. After approval: `gh pr merge "$PR_URL" --auto --squash`
 2. After approval: `gh pr update-branch "$PR_URL"` (brings branch current so CI runs)
-3. New `pr-autoupdate.yml` fires on every push to `testing`, calls `gh pr update-branch`
-   on all `BEHIND` PRs targeting testing (skips Renovate/Mergeraptor bots)
+3. New `pr-autoupdate.yml` fires on every push to `main`, calls `gh pr update-branch`
+   on all `BEHIND` PRs targeting main (skips Renovate/Patchraptor bots)
 
 **Also required:** `validate` must be in branch protection required status checks
 so `--auto` waits for CI before merging, not just for review approval.
 
 ```bash
 # Add validate as required check (branch protection API)
-gh api repos/projectbluefin/dakota/branches/main/protection \
+gh api repos/joshyorko/dudley-factory/branches/main/protection \
   --method PUT \
   --input - << 'JSON'
 {
@@ -1981,15 +1981,15 @@ remote: - Required status check "validate" is expected.
 
 **Root cause:** The `validate` job in `build.yml` only runs on `pull_request` events. A direct push from the sync workflow never triggers it, so the required status check can never be satisfied — GITHUB_TOKEN is always rejected.
 
-**Fix:** Remove `validate` from `testing` branch required status checks:
+**Fix:** Remove `validate` from `main` branch required status checks:
 ```bash
-gh api /repos/projectbluefin/dakota/branches/testing/protection/required_status_checks \
+gh api /repos/joshyorko/dudley-factory/branches/testing/protection/required_status_checks \
   -X PATCH --input - <<'PAYLOAD'
 {"strict": false, "contexts": []}
 PAYLOAD
 ```
 
-**Why this is safe:** `testing` is a loose integration branch — not a stability gate. PRs to testing still trigger the `validate` job (visible as an informational PR check), but without a required status check, `gh pr merge --auto` fails and pr-triage falls back to a direct squash merge immediately. PRs merge to testing without waiting for CI. The real quality gate is at `main` where `validate` IS required (via merge queue). Removing `validate` from `testing` branch protection trades PR-time CI enforcement on the integration branch for a working automated sync.
+**Why this is safe:** `main` is a loose integration branch — not a stability gate. PRs to main still trigger the `validate` job (visible as an informational PR check), but without a required status check, `gh pr merge --auto` fails and pr-triage falls back to a direct squash merge immediately. PRs merge to main without waiting for CI. The real quality gate is at `main` where `validate` IS required (via merge queue). Removing `validate` from `main` branch protection trades PR-time CI enforcement on the integration branch for a working automated sync.
 
 **Do NOT add PATs or tokens to the sync workflow — banned.** Fix is always at the branch protection level.
 

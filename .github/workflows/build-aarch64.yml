@@ -4,18 +4,18 @@ name: Build Dudley Bluefin (aarch64)
 #
 # Design invariants:
 #   - ARM NEVER blocks an x86_64 build, publish, promote, or release.
-#   - No job in publish.yml, promote-testing-to-main.yml, or execute-release.yml
+#   - No job in publish.yml or execute-release.yml
 #     depends on this workflow. Decoupling is structural, not just continue-on-error.
 #   - No remote execution (no RE service for ARM); enable-push: true so artifacts
 #     land in the remote CAS for subsequent builds and warm-cache runs.
 #
 # Triggers:
-#   - workflow_run: fires after x86_64 publish completes on testing — ARM builds
+#   - workflow_run: fires after x86_64 publish completes on main — ARM builds
 #     after x86 CAS writes are done, avoiding CAS write contention
 #   - workflow_dispatch: manual recovery / on-demand
 #
-# Published tags (when qualifying event on testing/main):
-#   :aarch64          — latest successful aarch64 build from testing
+# Published tags (when qualifying event on main):
+#   :aarch64          — latest successful aarch64 build from main
 #   :aarch64-<sha>    — immutable per-commit tag
 
 on:
@@ -24,7 +24,7 @@ on:
   workflow_run:
     workflows: ["Publish Dudley Bluefin"]
     types: [completed]
-    branches: [testing]
+    branches: [main]
   workflow_dispatch:
 
 permissions: read-all

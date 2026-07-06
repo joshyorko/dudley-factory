@@ -1,7 +1,7 @@
 ---
 
 name: pr-review
-description: Consolidated review workflow for dakota pull requests. Covers review priorities, common rejection reasons, dep-update PR review, and ghost (agent-assisted PR) handling. Use when asked to review any PR in projectbluefin/dakota or to sanity-check a branch before requesting maintainer review.
+description: Consolidated review workflow for dakota pull requests. Covers review priorities, common rejection reasons, dep-update PR review, and ghost (agent-assisted PR) handling. Use when asked to review any PR in joshyorko/dudley-factory or to sanity-check a branch before requesting maintainer review.
 metadata:
   context7-sources:
     - /websites/github_en_actions
@@ -37,7 +37,7 @@ Use when asked to review any Dakota PR, including feature PRs, dep-update PRs, o
 
 1. **Branch hygiene** — PR must branch from `upstream/main`, not a fork's local `main`. Verify with `git diff upstream/main...HEAD --stat` — it should be minimal and contain only the PR's changes.
 2. **Checklist compliance** — verify the relevant items from `pr-checklist.md` for the type of change (junction bump, patch, OCI, element, etc.).
-3. **CI gate status** — `validate` is a required status check on `main` (via merge queue). PRs targeting `testing` have no required status checks — testing is a loose integration branch; the quality gate is at `main`. If CI hasn't run on a main-targeting PR, note it. If `e2e` was skipped (non-image paths), that counts as passing.
+3. **CI gate status** — `validate` is a required status check on `main` (via merge queue). PRs targeting `main` have no required status checks — testing is a loose integration branch; the quality gate is at `main`. If CI hasn't run on a main-targeting PR, note it. If `e2e` was skipped (non-image paths), that counts as passing.
 4. **Scope discipline** — one logical change per PR. Junction bumps must not include patch modifications in the same commit.
 5. **Correctness** — element syntax, layer kind (`compose` not `stack`), cargo sources generated not hand-written, systemd units enabled via BST install commands.
 
@@ -66,20 +66,20 @@ Agent-assisted PRs are identified by the checked template checkbox:
 
 Hold these to the same standard as human PRs. The operator is accountable.
 
-## Mergeraptor pre-approval
+## Patchraptor pre-approval
 
-Junction-only bumps from `mergeraptor[bot]` are pre-approved once `validate` and `e2e` pass (or e2e is skipped for non-image paths). No human review required for those.
+Junction-only bumps from `Patchraptor[bot]` are pre-approved once `validate` and `e2e` pass (or e2e is skipped for non-image paths). No human review required for those.
 
 ## Dep-update PR review
 
-Auto-generated dep-update PRs (`auto/track-*`, `renovate/*`) always target
+Auto-generated dep-update PRs (`auto/track-*`, `patchraptor/*`) always target
 `main` by default. Before reviewing, check:
 
 1. **Is it redundant?** — Compare the `ref:` field in the element against
-   `upstream/testing`. If identical, close the PR; `testing` already has it.
+   `upstream/main`. If identical, close the PR; `main` already has it.
 2. **Cherry-pick, don't merge as-is** — The branch is based on `main` and
-   carries 4–6 unrelated CI/docs commits not in `testing`. Cherry-pick only
-   the top dep-update commit onto a clean `testing` base.
+   carries 4–6 unrelated CI/docs commits not in `main`. Cherry-pick only
+   the top dep-update commit onto a clean `main` base.
 3. **Skip e2e if infrastructure is broken** — If the same e2e failure appears
    on every dep PR simultaneously ("SSH never became ready"), it's a stale
    `:testing` issue, not a PR issue. Validate passing + correct diff is enough.

@@ -160,10 +160,10 @@ Copy `files/hive/hive-project.yaml.example` to `/etc/hive/hive-project.yaml` and
 
 ## Image stream and branch model
 
-Dakota uses trunk-based development. `testing` is the development trunk; `main` is a release bookmark fast-forwarded by `execute-release.yml` after each daily promotion.
+Dakota uses trunk-based development. `main` is the development trunk; `main` is a release bookmark fast-forwarded by `execute-release.yml` after each daily promotion.
 
 ```
-testing (development trunk — all PRs land here)
+main (factory source branch — all PRs land here)
   │
   └─► build.yml (daily 13:00 UTC + merge_group + workflow_dispatch)
           │
@@ -181,34 +181,34 @@ testing (development trunk — all PRs land here)
 
 | Stream | Tag | Cadence | Gate |
 |---|---|---|---|
-| Development | `:sha` | Every merge to `testing` | None |
-| Testing | `:testing` | Daily (13:00 UTC build) | boot-check |
+| Development | `:sha` | Every merge to `main` | None |
+| Testing stream | `:testing` | Daily (13:00 UTC build) | boot-check |
 | Stable | `:stable` | Daily (if :testing != :stable) | SHA freshness check + cosign verify + boot-check |
 
-**All PRs target `testing`.** This includes contributor PRs, Renovate PRs, and BST source bump PRs. The `main` git branch is a release bookmark only — it is fast-forwarded by `execute-release.yml` after each successful promotion and must not be used as a PR base.
+**All PRs target `main`.** This includes contributor PRs, Renovate PRs, and BST source bump PRs. The `main` git branch is a release bookmark only — it is fast-forwarded by `execute-release.yml` after each successful promotion and must not be used as a PR base.
 
-**Branch protection:** `testing` has the `testing-merge-queue-no-review` ruleset (required status checks: `validate` + `e2e`, merge queue). `main` has the `main-bookmark-protection` ruleset (deletion + non_fast_forward blocked; no merge queue, no required checks).
+**Branch protection:** `main` has the `main-merge-queue-no-review` ruleset (required status checks: `validate` + `e2e`, merge queue). `main` has the `main-bookmark-protection` ruleset (deletion + non_fast_forward blocked; no merge queue, no required checks).
 
 **Deleted workflows (OCI-native redesign, 2026-06-23):** `promote-testing-to-main.yml`, `pr-release-gate.yml`, `sync-main-to-testing.yml`, `cache-warm.yml`.
 
 ### Branch flow for contributors
 
 ```bash
-# Branch from upstream/testing (the development trunk)
-git checkout upstream/testing -b feat/my-change
+# Branch from upstream/main (the development trunk)
+git checkout upstream/main -b feat/my-change
 
 # Work, validate, commit
 just validate
 git commit -m "feat(bluefin): ..."
 
-# Push and open PR against testing
+# Push and open PR against main
 git push upstream feat/my-change
-gh pr create --repo projectbluefin/dakota --base testing
+gh pr create --repo joshyorko/dudley-factory --base main
 ```
 
 
 - [freedesktop-sdk](https://gitlab.com/freedesktop-sdk/freedesktop-sdk)
 - [gnome-build-meta](https://github.com/GNOME/gnome-build-meta) — branch `gnome-50`
-- [Dakota issues](https://github.com/projectbluefin/dakota/issues)
+- [Dakota issues](https://github.com/joshyorko/dudley-factory/issues)
 - [Dakota board](https://github.com/orgs/projectbluefin/projects/3)
 - [All Bluefin projects](https://github.com/orgs/projectbluefin/projects/2)

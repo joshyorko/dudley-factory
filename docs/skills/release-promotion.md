@@ -1,6 +1,6 @@
 ---
 name: release-promotion
-description: Dakota publish and promotion flow from testing to stable, including the daily OCI-native execute-release flow, SHA-based freshness check, cosign verify, boot-check gate, and manual recovery. Use when working on execute-release.yml, stable promotion failures, branch bookmark state, or the daily build pipeline.
+description: Dakota publish and promotion flow from main to stable, including the daily OCI-native execute-release flow, SHA-based freshness check, cosign verify, boot-check gate, and manual recovery. Use when working on execute-release.yml, stable promotion failures, branch bookmark state, or the daily build pipeline.
 metadata:
   context7-sources:
     - /websites/github_en_actions
@@ -11,7 +11,7 @@ metadata:
 
 ## Overview
 
-Promotion from `testing` to `:stable` is **fully automated and daily** — no human approval required at any stage.
+Promotion from `main` to `:stable` is **fully automated and daily** — no human approval required at any stage.
 
 ```text
 testing (trunk) → build.yml → publish.yml → :testing tag
@@ -35,7 +35,7 @@ Use when the task mentions:
 - `main-bookmark-protection` ruleset
 - cosign verify in the release path
 - stable release, `:stable`, or daily promotion flow
-- `testing-merge-queue-no-review` ruleset
+- `main-merge-queue-no-review` ruleset
 
 ## When NOT to Use
 
@@ -54,12 +54,12 @@ Use when the task mentions:
    - cosign verify `:testing`
    - skopeo copy `:testing` → `:stable`
    - fast-forward `main` bookmark
-3. **`execute-release.yml` fires via `workflow_run` from `publish.yml` on the `testing` branch.**
+3. **`execute-release.yml` fires via `workflow_run` from `publish.yml` on the `main` branch.**
    It checks whether the SHA published as `:testing` differs from the current `:stable`. If
    they are equal, promotion is skipped (already up to date). If they differ, cosign verify
    runs, then the copy and fast-forward. The image is already boot-checked by `publish.yml`.
 4. **`workflow_run` from publish — not a push trigger.** `execute-release.yml` starts
-   automatically after every successful `publish.yml` run on the `testing` branch. No cron
+   automatically after every successful `publish.yml` run on the `main` branch. No cron
    or commit-message gate required.
 5. **Do not add a promotion PR or merge queue step.** The squash PR ceremony was eliminated
    in the OCI-native redesign (issue 1073). Promotion is a direct OCI tag copy + git
@@ -70,12 +70,12 @@ Use when the task mentions:
 ## Promotion Map
 
 ```text
-push to testing (BST-affecting paths)
+push to main (BST-affecting paths)
   → build.yml (build job, including daily 13:00 UTC schedule)
   → publish.yml (workflow_run)
       → boot-check gate (must boot before :testing is promoted)
       → :testing tag published to GHCR
-  → execute-release.yml (workflow_run from publish on testing)
+  → execute-release.yml (workflow_run from publish on main)
       → SHA freshness check (:testing SHA vs :stable SHA)
           → skip if equal (already up to date)
           → cosign verify :testing
@@ -86,9 +86,9 @@ push to testing (BST-affecting paths)
 
 ## Branch Protection and Ruleset State
 
-### testing (development trunk)
+### main (factory source branch)
 
-Ruleset: `testing-merge-queue-no-review`
+Ruleset: `main-merge-queue-no-review`
 
 | Rule | Value |
 |---|---|
@@ -97,10 +97,10 @@ Ruleset: `testing-merge-queue-no-review`
 | Merge queue | enabled |
 | Force push | blocked |
 | Deletion | blocked |
-| Default branch | Yes — `testing` is the GitHub default branch |
+| Default branch | Yes — `main` is the GitHub default branch |
 
-**Ground truth (verified via `gh api repos/projectbluefin/dakota/rulesets/18053489`):**
-- The only required status check context on `testing` is `validate`.
+**Ground truth (verified via `gh api repos/joshyorko/dudley-factory/rulesets/18053489`):**
+- The only required status check context on `main` is `validate`.
 - `e2e` and `Boot check — gate` from `publish.yml` are **not** ruleset-enforced gates. They run as part of `publish.yml` post-merge and gate stream-tag movement / promotion, not merge-queue entry.
 - If you want `Boot check — gate` to block merge-queue entry, that is a Design Gate change to the ruleset — do not modify in passing.
 
@@ -122,13 +122,13 @@ Ruleset: `main-bookmark-protection`
 
 ## Workflow Configuration
 
-`execute-release.yml` fires via `workflow_run` from `publish.yml` on the `testing` branch:
+`execute-release.yml` fires via `workflow_run` from `publish.yml` on the `main` branch:
 
 ```yaml
 on:
   workflow_run:
     workflows: ["Publish Bluefin dakota"]
-    branches: [testing]
+    branches: [main]
     types: [completed]
   workflow_dispatch: {}
 ```
@@ -149,7 +149,7 @@ Do not substitute `github.event.workflow_run.head_sha` with a `skopeo inspect` l
 - `execute-release.yml` must use `head_sha` from the `workflow_run` event, not a floating `:testing` tag lookup.
 - `main` is a bookmark only. No PRs target main. `execute-release.yml` is the only writer.
 - The `main-bookmark-protection` ruleset must block non-fast-forward and deletion. No merge queue, no required checks.
-- The `testing-merge-queue-no-review` ruleset must require `validate` + `e2e` and enable the merge queue.
+- The `main-merge-queue-no-review` ruleset must require `validate` + `e2e` and enable the merge queue.
 - Stable promotion cadence is daily — triggered by `workflow_run` from `publish.yml` after each successful build.
 - The SHA freshness check compares the `:testing` SHA with the current `:stable` SHA. Equal → skip. Different → promote.
 - cosign `--certificate-identity-regexp` must be anchored with `^...$` and restricted to the publishing workflow file.
@@ -159,23 +159,23 @@ Do not substitute `github.event.workflow_run.head_sha` with a `skopeo inspect` l
 
 ```bash
 # check recent execute-release runs
-gh run list --repo projectbluefin/dakota --workflow 'Execute Release' --limit 10
+gh run list --repo joshyorko/dudley-factory --workflow 'Execute Release' --limit 10
 
 # check recent publish runs (execute-release fires after these)
-gh run list --repo projectbluefin/dakota --workflow 'Publish Bluefin dakota' --limit 10
+gh run list --repo joshyorko/dudley-factory --workflow 'Publish Bluefin dakota' --limit 10
 
 # dispatch execute-release manually (bypasses freshness check — use only for recovery)
-gh workflow run execute-release.yml --repo projectbluefin/dakota --ref testing
+gh workflow run execute-release.yml --repo joshyorko/dudley-factory --ref testing
 
 # verify ruleset state
-gh api repos/projectbluefin/dakota/rulesets | jq '[.[] | {id, name}]'
+gh api repos/joshyorko/dudley-factory/rulesets | jq '[.[] | {id, name}]'
 
 # inspect main bookmark (should match last :stable SHA)
-gh api repos/projectbluefin/dakota/branches/main | jq '.commit.sha'
+gh api repos/joshyorko/dudley-factory/branches/main | jq '.commit.sha'
 
 # compare :testing and :stable digests
-skopeo inspect docker://ghcr.io/projectbluefin/dakota:testing | jq '.Digest'
-skopeo inspect docker://ghcr.io/projectbluefin/dakota:stable  | jq '.Digest'
+skopeo inspect docker://ghcr.io/joshyorko/dudley-factory:testing | jq '.Digest'
+skopeo inspect docker://ghcr.io/joshyorko/dudley-factory:stable  | jq '.Digest'
 ```
 
 ## Ruleset Management
@@ -188,14 +188,14 @@ The ruleset cannot be updated via `PATCH /repos/.../rulesets/{id}` with a standa
 curl -X DELETE \
   -H "Authorization: Bearer $(gh auth token)" \
   -H "Accept: application/vnd.github+json" \
-  "https://api.github.com/repos/projectbluefin/dakota/rulesets/{OLD_ID}"
+  "https://api.github.com/repos/joshyorko/dudley-factory/rulesets/{OLD_ID}"
 
 # Create new ruleset
 curl -X POST \
   -H "Authorization: Bearer $(gh auth token)" \
   -H "Accept: application/vnd.github+json" \
   -H "Content-Type: application/json" \
-  "https://api.github.com/repos/projectbluefin/dakota/rulesets" \
+  "https://api.github.com/repos/joshyorko/dudley-factory/rulesets" \
   -d '{ ... }'
 ```
 
@@ -214,24 +214,24 @@ curl -X POST \
 - `execute-release.yml` using `skopeo inspect :testing` to get the SHA instead of `github.event.workflow_run.head_sha`
 - Any PR targeting `main` (main is a bookmark, not a development branch)
 - Adding a merge queue or required checks to the `main-bookmark-protection` ruleset
-- `testing-merge-queue-no-review` ruleset missing `validate` or `e2e` required checks
+- `main-merge-queue-no-review` ruleset missing `validate` or `e2e` required checks
 - Editing stable-promotion logic while the real failure is earlier in publish plumbing
 
 ## Verification
 
-- [ ] `execute-release.yml` trigger is `workflow_run` from `publish.yml` on `testing`
+- [ ] `execute-release.yml` trigger is `workflow_run` from `publish.yml` on `main`
 - [ ] `head_sha` from `workflow_run` event anchors cosign verify and the freshness check
 - [ ] `main-bookmark-protection` ruleset: non_fast_forward + deletion blocked, no merge queue
-- [ ] `testing-merge-queue-no-review` ruleset: `validate` + `e2e` required, merge queue enabled
+- [ ] `main-merge-queue-no-review` ruleset: `validate` + `e2e` required, merge queue enabled
 - [ ] No PRs exist targeting `main`
-- [ ] `testing` is the GitHub default branch
+- [ ] `main` is the GitHub default branch
 - [ ] Stable promoted without any human interaction after a successful publish
 
 ## Lessons Learned
 
-### release/blocked after CI-only push to testing is expected
+### release/blocked after CI-only push to main is expected
 
-When a paths-ignored push (e.g. `.github/workflows/**` change) advances the `testing`
+When a paths-ignored push (e.g. `.github/workflows/**` change) advances the `main`
 HEAD, the promote gate runs against the new SHA and finds no CI results for it.
 The gate correctly sets `release/blocked` — the SHA has never been built.
 
@@ -246,9 +246,9 @@ Before triggering or landing any change that starts a new BST build, cancel ALL
 in-progress BST jobs.
 
 ```bash
-gh run list --repo projectbluefin/dakota --json databaseId,status,name \
+gh run list --repo joshyorko/dudley-factory --json databaseId,status,name \
   | python3 -c "import json,sys; [print(r['databaseId'], r['name']) for r in json.load(sys.stdin) if r['status'] in ('in_progress','queued','pending')]"
-gh run cancel <run-id> --repo projectbluefin/dakota
+gh run cancel <run-id> --repo joshyorko/dudley-factory
 ```
 
 Cancel everything, let one build finish, then re-trigger if needed.
@@ -261,7 +261,7 @@ flow (issue 1073). The key differences:
 - **Deleted workflows:** `promote-testing-to-main.yml`, `pr-release-gate.yml`,
   `sync-main-to-testing.yml`, `cache-warm.yml`.
 - **`execute-release.yml`** now fires via `workflow_run` from `publish.yml` on the
-  `testing` branch — no cron, no commit-message gate.
+  `main` branch — no cron, no commit-message gate.
 - **SHA anchor:** `head_sha` from the `workflow_run` event is the source of truth for
   cosign verify and the freshness check. Never use `skopeo inspect :testing` as the
   anchor — that is a TOCTOU race.
@@ -269,8 +269,8 @@ flow (issue 1073). The key differences:
   skip promotion (already up to date). Different → promote.
 - **`main` is a bookmark.** Fast-forwarded by `execute-release.yml` only. No PRs
   target `main`. The `main-bookmark-protection` ruleset enforces this.
-- **`testing` is the development trunk.** All contributor, Renovate, and BST source
-  bump PRs target `testing`. The `testing-merge-queue-no-review` ruleset requires
+- **`main` is the development trunk.** All contributor, Renovate, and BST source
+  bump PRs target `main`. The `main-merge-queue-no-review` ruleset requires
   `validate` + `e2e` and enables the merge queue.
 - **Daily build schedule:** `build.yml` has a `schedule: '0 13 * * *'` trigger that
   fires at 13:00 UTC daily, keeping CAS warm and ensuring a fresh `:testing` each
@@ -303,7 +303,7 @@ image that was never legitimately published.
 
    ```bash
    gh run list \
-     --repo projectbluefin/dakota \
+     --repo joshyorko/dudley-factory \
      --workflow execute-release.yml \
      --status success \
      --json headSha,createdAt,displayTitle \
@@ -316,7 +316,7 @@ image that was never legitimately published.
 
    ```bash
    gh workflow run rollback-stable.yml \
-     --repo projectbluefin/dakota \
+     --repo joshyorko/dudley-factory \
      --ref main \
      -f target_sha=<sha> \
      -f reason="<short reason — appears in audit release notes>" \
@@ -344,7 +344,7 @@ image that was never legitimately published.
 - `dakota:${target_sha}` and `dakota-nvidia:${target_sha}` both exist (pair
   invariant — refuses to roll back a partial set).
 - Both images cosign-verify against the anchored
-  `publish.yml@refs/heads/(testing|gh-readonly-queue/testing/.+)` identity.
+  `publish.yml@refs/heads/(testing|gh-readonly-queue/main/.+)` identity.
 - Tags are moved with `skopeo copy --preserve-digests --all`, so the digest
   served by `:stable` is exactly the digest cosign signed.
 - A GitHub Release (`rollback-<sha>-<unix_ts>`, marked prerelease) is created
@@ -355,7 +355,7 @@ image that was never legitimately published.
 - It does **not** rewind the `main` bookmark. `main` continues to point at the
   most recent promoted SHA. The image stream and the git bookmark are
   intentionally decoupled in this flow — if the regression also needs a code
-  revert, open a normal PR against `testing` and let the promotion pipeline
+  revert, open a normal PR against `main` and let the promotion pipeline
   re-promote.
 - It does **not** delete the bad image. The previously-stable digest stays in
   GHCR (under its SHA tag) for forensics.

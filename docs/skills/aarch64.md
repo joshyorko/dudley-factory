@@ -54,8 +54,8 @@ execute-release.yml (after :stable is live)
 ## Triggers
 
 `build-aarch64.yml` has three triggers:
-- `push: testing/main` (BST-affecting paths only, same paths-ignore as `build.yml`)
-- `workflow_run` from `publish.yml` on `testing` — serializes ARM start after x86_64 CAS writes complete
+- `workflow_run from publish on main` (BST-affecting paths only, same paths-ignore as `build.yml`)
+- `workflow_run` from `publish.yml` on `main` — serializes ARM start after x86_64 CAS writes complete
 - `workflow_dispatch` — manual recovery / on-demand
 
 The `workflow_run` trigger is the primary production path. `push` provides direct ARM builds on BST-affecting commits to `testing` or `main`.
@@ -92,9 +92,9 @@ The `build-aarch64` job was originally in `build.yml` with `if: false` (disabled
 
 ### ARM trigger updated to include workflow_run from publish (2026-06-23)
 
-`build-aarch64.yml` previously used only a Tuesday cron + `push: testing/main` trigger. Added `workflow_run` from `publish.yml` on `testing` to also serialize ARM after x86_64 CAS writes complete. This eliminated the `Cached elements after warm: 0` failures caused by concurrent x86_64 and ARM CAS writes.
+`build-aarch64.yml` previously used only a Tuesday cron + `workflow_run from publish on main` trigger. Added `workflow_run` from `publish.yml` on `main` to also serialize ARM after x86_64 CAS writes complete. This eliminated the `Cached elements after warm: 0` failures caused by concurrent x86_64 and ARM CAS writes.
 
 ### Publish skips after docs-only commits (2026-06-22)
 
-When all recent commits on `testing` are paths-ignored (docs/AGENTS.md only), no automatic build fires and `:testing` goes stale. Recovery: manual `workflow_dispatch` on `build.yml` targeting `testing`. After the build, `publish.yml` fires automatically, which then triggers `build-aarch64.yml`.
+When all recent commits on `main` are paths-ignored (docs/AGENTS.md only), no automatic build fires and `:testing` goes stale. Recovery: manual `workflow_dispatch` on `build.yml` targeting `main`. After the build, `publish.yml` fires automatically, which then triggers `build-aarch64.yml`.
 

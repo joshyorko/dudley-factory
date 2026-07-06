@@ -6,8 +6,8 @@
 |---|---|---|
 | `validate` | `pull_request` | `bst show` — graph + patch check (~15 min) |
 | `e2e` | `pull_request` when `elements/`, `files/`, `patches/`, `Justfile`, or `project.conf` changed | Smoke test in QEMU via projectbluefin/testsuite |
-| `build` | `push: testing/next` (paths-ignore: `.github/workflows/**`, `docs/**`, `**.md`, `AGENTS.md`), `merge_group`, `workflow_dispatch`, `schedule: daily 13:00 UTC` — skips on `pull_request` | Full OCI build (~60–90 min) |
-| `build-aarch64` | `push: testing/main` (BST-affecting paths only), `workflow_run` from `publish.yml` on `testing`, `workflow_dispatch` | ARM64 — fully decoupled, never blocks release |
+| `build` | `schedule / workflow_dispatch` (paths-ignore: `.github/workflows/**`, `docs/**`, `**.md`, `AGENTS.md`), `merge_group`, `workflow_dispatch`, `schedule: daily 13:00 UTC` — skips on `pull_request` | Full OCI build (~60–90 min) |
+| `build-aarch64` | `workflow_run from publish on main` (BST-affecting paths only), `workflow_run` from `publish.yml` on `main`, `workflow_dispatch` | ARM64 — fully decoupled, never blocks release |
 
 ## Publish pipeline (publish.yml)
 
@@ -38,7 +38,7 @@ build.yml (testing|next) → [workflow_run] → publish.yml
 ```
 push to testing (BST-affecting) or daily 13:00 UTC schedule
   → build.yml → publish.yml → boot-check → :testing
-  → execute-release.yml (workflow_run from publish on testing)
+  → execute-release.yml (workflow_run from publish on main)
        → SHA freshness check (:testing SHA vs :stable SHA)
            → skip if equal (already up to date)
            → cosign verify :testing

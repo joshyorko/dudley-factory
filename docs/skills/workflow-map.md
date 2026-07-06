@@ -33,7 +33,6 @@ Use when you need to answer:
    - `pull_request`
    - `merge_group`
    - `workflow_run`
-   - `push: testing`
    - `push: main`
    - `workflow_dispatch`
 2. **Map the event to the owning workflow.**
@@ -46,7 +45,7 @@ PR touching image paths
   ├─ validate (PR syntax / graph checks)
   └─ e2e (testsuite wrapper; change-detected)
 
-Merge queue → testing or next
+Merge queue → main or next
   └─ build.yml
        └─ publish.yml (workflow_run from build)
             ├─ publish-image
@@ -54,16 +53,16 @@ Merge queue → testing or next
             ├─ publish-sbom [parallel]
             └─ promote to :testing / :next / :btw
 
-Daily 13:00 UTC / push: testing (BST-affecting paths) / manual
+Daily 13:00 UTC / push: main (BST-affecting paths) / manual
   └─ build.yml (schedule or push trigger)
        └─ publish.yml (workflow_run from build)
             ├─ boot-check gate [must boot before :testing]
             └─ promote to :testing
 
-Successful publish.yml on testing
+Successful publish.yml on main
   ├─ publish-smoke.yml
   │    └─ smoke suite [observational only]
-  └─ execute-release.yml (workflow_run from publish, testing branch)
+  └─ execute-release.yml (workflow_run from publish, main branch)
        ├─ SHA freshness check (:testing vs :stable digest)
        │    └─ skip if equal (already up to date)
        ├─ cosign verify :testing
@@ -71,8 +70,8 @@ Successful publish.yml on testing
        ├─ fast-forward main bookmark
        └─ create GitHub Release
 
-Successful publish.yml on testing   ← PARALLEL, DECOUPLED
-  └─ build-aarch64.yml (workflow_run from publish on testing)
+Successful publish.yml on main   ← PARALLEL, DECOUPLED
+  └─ build-aarch64.yml (workflow_run from publish on main)
        └─ :aarch64 and :aarch64-<sha> published to GHCR
           (no effect on x86_64 builds, publish, or release)
 ```
@@ -83,14 +82,13 @@ Successful publish.yml on testing   ← PARALLEL, DECOUPLED
 
 | Workflow | Owns | Normal trigger |
 |---|---|---|
-| `.github/workflows/build.yml` | BST build into remote CAS | `push: testing/next` (paths-ignore: docs, workflows, md, `files/scripts/**`), `merge_group`, `workflow_dispatch`, `schedule: daily 13:00 UTC`. `validate` job runs on `pull_request` only; `build` job skips `pull_request`. |
-| `.github/workflows/build-aarch64.yml` | aarch64 OCI build + GHCR push | `push: testing/main` (BST-affecting paths), `workflow_run` from `publish.yml` on `testing`, `workflow_dispatch`. Fully decoupled — never in `needs:` of publish/promote/release. |
+| `.github/workflows/build.yml` | BST build into remote CAS | `workflow_dispatch`, `schedule: daily 13:00 UTC`. |
+| `.github/workflows/build-aarch64.yml` | aarch64 OCI build + GHCR push | `workflow_run` from `publish.yml` on `main`, `workflow_dispatch`. Fully decoupled — never in `needs:` of publish/promote/release. |
 | `.github/workflows/publish.yml` | export, sign, boot-check, promote tags | `workflow_run` from build |
 | `.github/workflows/publish-smoke.yml` | observational smoke only | `workflow_run` from publish |
 | `.github/workflows/e2e.yml` | PR-facing testsuite check | `pull_request` |
-| `.github/workflows/execute-release.yml` | SHA freshness check → cosign verify → stable release | `workflow_run` from `publish.yml` on `testing`, `workflow_dispatch`. Skips if `:testing` digest equals `:stable` digest. |
-| `.github/workflows/sync-next-from-main.yml` | merge main into next (preserve junction refs) | `push: main`, `workflow_dispatch` |
-| ~~`promote-testing-to-main.yml`~~ | DELETED | Was: `push: testing`, schedule, manual |
+| `.github/workflows/execute-release.yml` | SHA freshness check → cosign verify → stable release | `workflow_run` from `publish.yml` on `main`, `workflow_dispatch`. Skips if `:testing` digest equals `:stable` digest. |
+| ~~`promote-testing-to-main.yml`~~ | DELETED | Was: `old testing-branch push`, schedule, manual |
 | ~~`pr-release-gate.yml`~~ | DELETED | Was: `pull_request` to `main` |
 | ~~`sync-main-to-testing.yml`~~ | DELETED | Was: `push: main` |
 | ~~`cache-warm.yml`~~ | DELETED | Was: Mon/Thu 06:00 UTC schedule |
@@ -99,24 +97,24 @@ Successful publish.yml on testing   ← PARALLEL, DECOUPLED
 
 | Branch | Trigger | Published tag(s) | Notes |
 |---|---|---|---|
-| `testing` | `push` (BST-affecting paths only) or `schedule: 13:00 UTC` | `:testing` | **Development trunk. Primary `:testing` publish path.** Every BST-affecting push builds → publishes → promotes. Doc/workflow-only pushes are ignored (paths-ignore). |
+| `main` | `push` (BST-affecting paths only) or `schedule: 13:00 UTC` | `:testing` | **Development trunk. Primary `:testing` publish path.** Every BST-affecting push builds → publishes → promotes. Doc/workflow-only pushes are ignored (paths-ignore). |
 | `main` | fast-forward from `execute-release.yml` | `:stable` | **Release bookmark only.** Only `execute-release.yml` writes here after a successful SHA freshness check + cosign verify + boot-check. No PRs target `main`. |
-| `next` | `push` or `sync-next-from-main` dispatch | `:next`, `:btw` | Rolling GNOME master; never stable. No PR requirement on branch protection. |
-| `gh-readonly-queue/testing/*` | merge-queue | (build only, no tag) | Gate before merge to `testing`. |
+| `next` | `push` or `retired-next-sync` dispatch | `:next`, `:btw` | Rolling GNOME master; never stable. No PR requirement on branch protection. |
+| `gh-readonly-queue/main/*` | merge-queue | (build only, no tag) | Gate before merge to `main`. |
 | `gh-readonly-queue/next/*` | merge-queue | (build only, no tag) | Gate before merge to `next`. |
-| `testing` (BST paths) | `workflow_run` from publish | `:aarch64`, `:aarch64-<sha>` | Published by `build-aarch64.yml`. Completely decoupled from x86_64 flow. Never blocks release. |
+| `main` (BST paths) | `workflow_run` from publish | `:aarch64`, `:aarch64-<sha>` | Published by `build-aarch64.yml`. Completely decoupled from x86_64 flow. Never blocks release. |
 
 **What testing does (not just PRs):**
 ```
-push to testing (BST-affecting) or daily 13:00 UTC schedule
+push to main (BST-affecting) or daily 13:00 UTC schedule
   → build.yml (build job)
   → publish.yml (workflow_run)
       → :testing tag published to GHCR
-  → execute-release.yml (workflow_run from publish on testing)
+  → execute-release.yml (workflow_run from publish on main)
       → SHA freshness check → cosign verify → boot-check
       → skopeo copy :testing → :stable
       → fast-forward main bookmark
-  → build-aarch64.yml (workflow_run from publish on testing)
+  → build-aarch64.yml (workflow_run from publish on main)
       → :aarch64 / :aarch64-<sha> published (decoupled, never blocks release)
 ```
 
@@ -131,11 +129,11 @@ push to testing (BST-affecting) or daily 13:00 UTC schedule
 ## Red Flags
 
 - Debugging `publish.yml` when the branch only ever hits `e2e.yml`
-- Treating `testing` as the branch that publishes stable directly
+- Treating `main` as the branch that publishes stable directly
 - Editing a workflow before checking whether a different workflow actually owns the stage
 - Assuming `workflow_dispatch` behaves like `workflow_run`
 - A branch-sync workflow that only lives on the target branch (will never fire — must be on default branch)
-- Re-adding PR requirement to `next` branch protection (breaks `sync-next-from-main` direct push)
+- Re-adding PR requirement to `next` branch protection (breaks `retired-next-sync` direct push)
 
 ## Verification
 

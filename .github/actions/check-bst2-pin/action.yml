@@ -1,5 +1,5 @@
 name: Check bst2 pin
-description: Ensure the bst2 image SHA matches between Justfile and track-bst-sources workflow.
+description: Ensure the bst2 image SHA matches between Justfile and the source tracking workflow.
 
 runs:
   using: composite

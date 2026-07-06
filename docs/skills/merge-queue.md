@@ -46,7 +46,7 @@ gh pr view <N> --repo projectbluefin/dakota --json baseRefName,headRefName,merge
 
 ## Rebase Conflicting PRs
 
-Content PRs (features, fixes, BST changes) target `testing`. GHA-only dep-update PRs (Renovate workflow pins) also target `testing` and are filtered from builds by `paths-ignore`. Sequential merges advance `testing`, making earlier branches stale.
+Content PRs (features, fixes, BST changes) target `main`. GHA-only dep-update PRs (Renovate workflow pins) also target `main` and are filtered from builds by `paths-ignore`. Sequential merges advance `testing`, making earlier branches stale.
 
 Use this loop:
 
@@ -128,7 +128,7 @@ Options:
 
 ## PR Branch Targets
 
-Content PRs (features, fixes, BST/element changes) target `testing`. **Never `main`** — main only receives squash-merge promotion commits. Check `baseRefName` before rebasing:
+Content PRs (features, fixes, BST/element changes) target `main`. Check `baseRefName` before rebasing:
 
 ```bash
 gh pr view <N> --repo projectbluefin/dakota --json baseRefName,isCrossRepository \

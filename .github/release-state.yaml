@@ -1,5 +1,5 @@
-# Managed by the Dudley Factory stable promotion flow.
-# Empty values mean no Dudley Factory stable image has been promoted yet.
+# Placeholder for a future Dudley Factory stable promotion flow.
+# Stable promotion is currently disabled until parity is proven.
 testing:
   dudley-bluefin: ""
   dudley-bluefin-nvidia: ""

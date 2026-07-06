@@ -44,9 +44,10 @@ Use when you need product/repo context before planning work, when someone asks w
 - The validation gate is: `bootc upgrade` on test hardware succeeds + reboot + GDM active.
 - CI green is not sufficient. Hardware confirmation is.
 
-**Production image = `ghcr.io/projectbluefin/dakota:stable`.**
-- Streams: `:testing` (on every BST-affecting push to `testing`), `:stable` (daily automated via `execute-release.yml` — no human approval)
-- Rolling nightly stream: `:next` / `:btw` (GNOME 51 master — see below)
+**Dudley Factory images are parity-lab images, not production.**
+- Streams: `ghcr.io/joshyorko/dudley-bluefin:testing` and `ghcr.io/joshyorko/dudley-bluefin-nvidia:testing`.
+- Stable promotion is disabled until boot, update, rollback, installer, and NVIDIA parity are proven.
+- `joshyorko/dudley-os` remains the production release path.
 - When someone says "is X in the image", check the GHCR image via `skopeo inspect` or `podman run --rm` — not a local machine unless explicitly asked.
 
 **Verify hypothesis before stating root cause.**
@@ -60,7 +61,7 @@ freedesktop-sdk provides glibc/systemd/kernel, gnome-build-meta provides GNOME S
 
 **Key positioning:** Dakota is a **curated subset** of production Bluefin, not a 1:1 clone. It intentionally includes things production Bluefin doesn't have (sudo-rs, uutils-coreutils, GNOME nightly) and intentionally omits things that don't make sense for a from-source build (Nvidia drivers, ZFS, enterprise AD/Kerberos).
 
-Published image: `ghcr.io/projectbluefin/dakota:{testing,stable,next,btw}`
+Published images: `ghcr.io/joshyorko/dudley-bluefin:testing` and `ghcr.io/joshyorko/dudley-bluefin-nvidia:testing`.
 
 ## Image Streams
 

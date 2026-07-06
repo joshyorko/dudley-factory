@@ -123,6 +123,7 @@ jobs:
       # - cache-buildtrees: never -> save disk (we only need final artifacts)
       #
       - name: Generate BuildStream CI config
+        id: bst_config
         env:
           CASD_CLIENT_CERT: ${{ vars.CASD_CLIENT_CERT }}
           CASD_CLIENT_KEY: ${{ secrets.CASD_CLIENT_KEY }}
@@ -189,10 +190,17 @@ jobs:
       # a sustained gRPC stream during the build phase. --deps run ensures every
       # runtime element rebuilt locally or pulled during the build is cached.
       - name: Push OCI artifact to remote CAS
+        if: steps.bst_config.outputs.cache-credentials-present == 'true'
         env:
           BST_FLAGS: -o x86_64_v3 true --no-interactive --config /src/buildstream-push.conf
         run: |
           just bst artifact push --deps run ${{ matrix.element }}
+
+      - name: Skip remote CAS push without credentials
+        if: steps.bst_config.outputs.cache-credentials-present != 'true'
+        run: |
+          echo "Skipping remote CAS artifact push because CASD_CLIENT_CERT and CASD_CLIENT_KEY are not both configured."
+          echo "The local BuildStream build remains valid; the next publish job will need a cached artifact or credentials."
 
       # ── Upload build logs ─────────────────────────────────────────────
       # Always upload, even on failure, so build failures can be diagnosed.

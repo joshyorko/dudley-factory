@@ -52,7 +52,7 @@ Route through `ci.md` first, then come here only when the focused skills do not 
 | Build timeout | 330 min (job: 360 min) |
 | Remote cache server | `cache.projectbluefin.io:11002` |
 | Cache auth | mTLS — `CASD_CLIENT_CERT` (repo variable) + `CASD_CLIENT_KEY` (secret) |
-| Published image | `ghcr.io/joshyorko/dudley-factory:{testing,stable,next,btw}` and `:$SHA` |
+| Published image | `ghcr.io/joshyorko/dudley-bluefin:testing`, `ghcr.io/joshyorko/dudley-bluefin-nvidia:testing`, and immutable `:$SHA` tags |
 | Build logs artifact | `buildstream-logs-x86_64-<variant>` (7-day retention) |
 | Trigger (validate) | `pull_request` — `bst show --deps all`, no CAS |
 | Trigger (build) | `schedule: daily 13:00 UTC`, `merge_group`, `workflow_dispatch` (no push trigger) |
@@ -854,25 +854,27 @@ changed.
 2. Next promotion: NVIDIA `:testing` now exists, but `dakota:testing == dakota:latest`
    → `has_diff=false` → entire promote job skipped → `dakota-nvidia:stable` never set
 
-**Fix (manual):** Copy from the matching `:testing` digest directly:
+**Historical Dakota fix only:** stable promotion is disabled in Dudley Factory.
+If stable promotion is later enabled, copy from the matching `:testing` digest
+directly:
 
 ```bash
 # Confirm revision matches dakota:stable
-skopeo inspect docker://ghcr.io/joshyorko/dudley-factory:stable \
+skopeo inspect docker://ghcr.io/joshyorko/dudley-bluefin:stable \
   | jq '.Labels["org.opencontainers.image.revision"]'
-skopeo inspect docker://ghcr.io/joshyorko/dudley-factory-nvidia:testing \
+skopeo inspect docker://ghcr.io/joshyorko/dudley-bluefin-nvidia:testing \
   | jq '.Labels["org.opencontainers.image.revision"]'
 
 # Get the testing digest
-DIGEST=$(skopeo inspect docker://ghcr.io/joshyorko/dudley-factory-nvidia:testing \
+DIGEST=$(skopeo inspect docker://ghcr.io/joshyorko/dudley-bluefin-nvidia:testing \
   | jq -r '.Digest')
 
 # Copy to :stable (login with gh auth token first)
 GH_TOKEN=$(gh auth token)
 skopeo login ghcr.io --username <your-user> --password "$GH_TOKEN"
 skopeo copy \
-  "docker://ghcr.io/joshyorko/dudley-factory-nvidia@${DIGEST}" \
-  "docker://ghcr.io/joshyorko/dudley-factory-nvidia:stable"
+  "docker://ghcr.io/joshyorko/dudley-bluefin-nvidia@${DIGEST}" \
+  "docker://ghcr.io/joshyorko/dudley-bluefin-nvidia:stable"
 ```
 
 **Underlying bug:** `check-diff` should also detect missing variant stable tags

@@ -1,4 +1,12 @@
-# Community workflow
+# Dudley Factory Workflow
+
+Dudley Factory is seeded from Project Bluefin Dakota's BuildStream model, but
+this repository is not the current production release path. The first supported
+factory targets are `dudley-bluefin` and `dudley-bluefin-nvidia`.
+
+The stable promotion is disabled until both variants build, boot, update, roll
+back, and pass installer parity. Treat inherited Dakota workflow notes below as
+implementation source material, not current Dudley release policy.
 
 ## Issue flow
 
@@ -160,55 +168,53 @@ Copy `files/hive/hive-project.yaml.example` to `/etc/hive/hive-project.yaml` and
 
 ## Image stream and branch model
 
-Dakota uses trunk-based development. `main` is the development trunk; `main` is a release bookmark fast-forwarded by `execute-release.yml` after each daily promotion.
+Dudley Factory uses `main` as the active source branch for the factory
+experiment. The testing images are:
+
+- `ghcr.io/joshyorko/dudley-bluefin:testing`
+- `ghcr.io/joshyorko/dudley-bluefin-nvidia:testing`
+
+The workflow keeps stable promotion disabled until parity is explicitly proven.
 
 ```
 main (factory source branch — all PRs land here)
   │
-  └─► build.yml (daily 13:00 UTC + merge_group + workflow_dispatch)
+  └─► build.yml (daily 13:00 UTC + workflow_dispatch)
           │
           └─► publish.yml (workflow_run on build success)
                   │
                   ├─► :sha     — immutable per-build tag
                   └─► :testing — published after boot-check passes
-                                       │
-                              execute-release.yml
-                              (workflow_run from publish, daily if :testing != :stable)
-                              SHA-based freshness check → cosign verify → boot-check gate
-                                       │
-                                       └─► :stable  (+ fast-forwards main bookmark)
 ```
 
 | Stream | Tag | Cadence | Gate |
 |---|---|---|---|
-| Development | `:sha` | Every merge to `main` | None |
-| Testing stream | `:testing` | Daily (13:00 UTC build) | boot-check |
-| Stable | `:stable` | Daily (if :testing != :stable) | SHA freshness check + cosign verify + boot-check |
+| Immutable build | `:sha` | Successful publish export | BuildStream build, chunking, lint, signing |
+| Testing stream | `:testing` | `main` publish after boot check | boot-check |
+| Stable | `:stable` | Disabled | boot, update, rollback, installer, and NVIDIA parity |
 
-**All PRs target `main`.** This includes contributor PRs, Renovate PRs, and BST source bump PRs. The `main` git branch is a release bookmark only — it is fast-forwarded by `execute-release.yml` after each successful promotion and must not be used as a PR base.
+**All PRs target `main`.** This includes contributor PRs, Renovate PRs, and BST
+source bump PRs.
 
-**Branch protection:** `main` has the `main-merge-queue-no-review` ruleset (required status checks: `validate` + `e2e`, merge queue). `main` has the `main-bookmark-protection` ruleset (deletion + non_fast_forward blocked; no merge queue, no required checks).
+**Branch protection:** keep `validate` required for graph and contract changes.
+Heavy image build and boot parity are reported separately.
 
 **Deleted workflows (OCI-native redesign, 2026-06-23):** `promote-testing-to-main.yml`, `pr-release-gate.yml`, `sync-main-to-testing.yml`, `cache-warm.yml`.
 
 ### Branch flow for contributors
 
 ```bash
-# Branch from upstream/main (the development trunk)
-git checkout upstream/main -b feat/my-change
+# Branch from origin/main (the factory source branch)
+git checkout origin/main -b feat/my-change
 
 # Work, validate, commit
 just validate
 git commit -m "feat(bluefin): ..."
 
 # Push and open PR against main
-git push upstream feat/my-change
-gh pr create --repo joshyorko/dudley-factory --base main
 ```
 
 
 - [freedesktop-sdk](https://gitlab.com/freedesktop-sdk/freedesktop-sdk)
 - [gnome-build-meta](https://github.com/GNOME/gnome-build-meta) — branch `gnome-50`
-- [Dakota issues](https://github.com/joshyorko/dudley-factory/issues)
-- [Dakota board](https://github.com/orgs/projectbluefin/projects/3)
-- [All Bluefin projects](https://github.com/orgs/projectbluefin/projects/2)
+- [Dudley Factory issues](https://github.com/joshyorko/dudley-factory/issues)

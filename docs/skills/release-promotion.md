@@ -173,9 +173,9 @@ gh api repos/joshyorko/dudley-factory/rulesets | jq '[.[] | {id, name}]'
 # inspect main bookmark (should match last :stable SHA)
 gh api repos/joshyorko/dudley-factory/branches/main | jq '.commit.sha'
 
-# compare :testing and :stable digests
-skopeo inspect docker://ghcr.io/joshyorko/dudley-factory:testing | jq '.Digest'
-skopeo inspect docker://ghcr.io/joshyorko/dudley-factory:stable  | jq '.Digest'
+# compare :testing and :stable digests only if stable promotion is later enabled
+skopeo inspect docker://ghcr.io/joshyorko/dudley-bluefin:testing | jq '.Digest'
+skopeo inspect docker://ghcr.io/joshyorko/dudley-bluefin:stable  | jq '.Digest'
 ```
 
 ## Ruleset Management

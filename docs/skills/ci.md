@@ -248,7 +248,8 @@ Ruleset: `main-bookmark-protection`
 | Non-fast-forward | blocked |
 | Deletion | blocked |
 
-`main` is written only by `execute-release.yml` via fast-forward after each successful stable promotion.
+In Dudley Factory, stable promotion is disabled. If a future parity gate enables
+stable promotion, this Dakota bookmark model must be revalidated before use.
 
 **e2e change detection:** `e2e` only tests PRs touching `elements/`, `files/`, `patches/`, `Justfile`, or `project.conf`. For all other paths (e.g. workflow pin bumps) the `e2e` job is skipped, which satisfies the required check. The `should-run` job uses `git diff` against the PR base — no `paths:` filter on the trigger.
 
@@ -833,25 +834,27 @@ changed.
 2. Next promotion: NVIDIA `:testing` now exists, but `dakota:testing == dakota:stable`
    → `has_diff=false` → entire promote job skipped → `dakota-nvidia:stable` never set
 
-**Fix (manual):** Copy from the matching `:testing` digest directly:
+**Historical Dakota fix only:** stable promotion is disabled in Dudley Factory.
+If stable promotion is later enabled, copy from the matching `:testing` digest
+directly:
 
 ```bash
 # Confirm revision matches dakota:stable
-skopeo inspect docker://ghcr.io/joshyorko/dudley-factory:stable \
+skopeo inspect docker://ghcr.io/joshyorko/dudley-bluefin:stable \
   | jq '.Labels["org.opencontainers.image.revision"]'
-skopeo inspect docker://ghcr.io/joshyorko/dudley-factory-nvidia:testing \
+skopeo inspect docker://ghcr.io/joshyorko/dudley-bluefin-nvidia:testing \
   | jq '.Labels["org.opencontainers.image.revision"]'
 
 # Get the testing digest
-DIGEST=$(skopeo inspect docker://ghcr.io/joshyorko/dudley-factory-nvidia:testing \
+DIGEST=$(skopeo inspect docker://ghcr.io/joshyorko/dudley-bluefin-nvidia:testing \
   | jq -r '.Digest')
 
 # Copy to :stable (login with gh auth token first)
 GH_TOKEN=$(gh auth token)
 skopeo login ghcr.io --username <your-user> --password "$GH_TOKEN"
 skopeo copy \
-  "docker://ghcr.io/joshyorko/dudley-factory-nvidia@${DIGEST}" \
-  "docker://ghcr.io/joshyorko/dudley-factory-nvidia:stable"
+  "docker://ghcr.io/joshyorko/dudley-bluefin-nvidia@${DIGEST}" \
+  "docker://ghcr.io/joshyorko/dudley-bluefin-nvidia:stable"
 ```
 
 **Underlying bug:** `check-diff` should also detect missing variant stable tags

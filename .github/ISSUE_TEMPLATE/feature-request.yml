@@ -8,7 +8,7 @@ body:
       value: |
         ## Humans decide what gets built. Contributors build it.
 
-        This is not a ticket system — it is a conversation between you and the people building Dakota.
+        This is not a ticket system - it is a conversation between you and the people building Dudley Factory.
         A maintainer will read this, decide if it fits the project's direction, and approve it.
         Once approved, a contributor or agent can claim and ship it.
 
@@ -20,7 +20,7 @@ body:
         **Ask yourself before submitting:**
         - Can someone read this and know exactly what file to change? Remember LLMs are non-deterministic
         - Does "done" have a clear finish line — a command to run, a thing to see?
-        - Is this specific to Dakota, or would it be better filed upstream (GNOME, fdsdk, bootc)?
+        - Is this specific to Dudley Factory, or would it be better filed upstream (GNOME, fdsdk, bootc)?
 
   - type: markdown
     attributes:

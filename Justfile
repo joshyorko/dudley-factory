@@ -4,8 +4,8 @@ default:
     @just --list
 
 # ── Configuration ─────────────────────────────────────────────────────
-export image_name := env("BUILD_IMAGE_NAME", "dakota")
-export image_tag := env("BUILD_IMAGE_TAG", "latest")
+export image_name := env("BUILD_IMAGE_NAME", "dudley-bluefin")
+export image_tag := env("BUILD_IMAGE_TAG", "testing")
 export base_dir := env("BUILD_BASE_DIR", ".")
 export filesystem := env("BUILD_FILESYSTEM", "btrfs")
 
@@ -66,7 +66,12 @@ check-publish-workflow:
     python3 scripts/check_publish_workflow.py
 
 [group('dev')]
+test-unit:
+    python3 -m unittest tests.test_factory_contract -v
+
+[group('dev')]
 validate:
+    just test-unit
     just check-publish-workflow
     just bst show --deps all oci/bluefin.bst
     just bst show --deps all oci/bluefin-nvidia.bst
@@ -75,27 +80,27 @@ validate:
 # Build the OCI image and load it into podman.
 #
 # Variant selects which top-level OCI element to build:
-#   all     → both default and nvidia, sequentially  (refs below)
-#   default → oci/bluefin.bst                        ({{image_name}}:{{image_tag}})
-#   nvidia  → oci/bluefin-nvidia.bst                 ({{image_name}}-nvidia:{{image_tag}})
+#   all             → both bluefin and bluefin-nvidia, sequentially
+#   bluefin         → oci/bluefin.bst        ({{image_name}}:{{image_tag}})
+#   bluefin-nvidia  → oci/bluefin-nvidia.bst ({{image_name}}-nvidia:{{image_tag}})
 #
 # Usage:
-#   just build              # builds BOTH variants (default + nvidia)
-#   just build default      # only default bluefin variant
-#   just build nvidia       # only nvidia variant
+#   just build                 # builds BOTH variants (Bluefin + NVIDIA)
+#   just build bluefin         # only Dudley Bluefin
+#   just build bluefin-nvidia  # only Dudley Bluefin NVIDIA
 #
 # When variant=all we run the per-variant build recursively so each one
 # also runs its own export, leaving two podman refs:
-# dakota:latest and dakota-nvidia:latest.
+# dudley-bluefin:testing and dudley-bluefin-nvidia:testing.
 [group('build')]
 build variant="all":
     #!/usr/bin/env bash
     set -euo pipefail
 
     if [ "{{variant}}" = "all" ]; then
-        just build default
+        just build bluefin
         if [ "${BUILD_SKIP_NVIDIA:-}" != "1" ]; then
-            just build nvidia
+            just build bluefin-nvidia
         else
             echo "==> Skipping nvidia variant (BUILD_SKIP_NVIDIA=1)"
         fi
@@ -103,9 +108,9 @@ build variant="all":
     fi
 
     case "{{variant}}" in
-        default) ELEMENT="oci/bluefin.bst" ;;
-        nvidia)  ELEMENT="oci/bluefin-nvidia.bst" ;;
-        *) echo "ERROR: unknown variant '{{variant}}' (expected: all | default | nvidia)" >&2; exit 1 ;;
+        bluefin|default)        ELEMENT="oci/bluefin.bst" ;;
+        bluefin-nvidia|nvidia)  ELEMENT="oci/bluefin-nvidia.bst" ;;
+        *) echo "ERROR: unknown variant '{{variant}}' (expected: all | bluefin | bluefin-nvidia)" >&2; exit 1 ;;
     esac
 
     echo "==> Building $ELEMENT with BuildStream (inside bst2 container)..."
@@ -121,14 +126,14 @@ build variant="all":
 # Uses SUDO_CMD to handle root vs non-root: CI runs as root (no sudo),
 # local dev needs sudo for podman access to containers-storage.
 [group('build')]
-export variant="default":
+export variant="bluefin":
     #!/usr/bin/env bash
     set -euo pipefail
 
     case "{{variant}}" in
-        default) ELEMENT="oci/bluefin.bst";        FINAL_NAME="{{image_name}}" ;;
-        nvidia)  ELEMENT="oci/bluefin-nvidia.bst"; FINAL_NAME="{{image_name}}-nvidia" ;;
-        *) echo "ERROR: unknown variant '{{variant}}' (expected: default | nvidia)" >&2; exit 1 ;;
+        bluefin|default)        ELEMENT="oci/bluefin.bst";        FINAL_NAME="{{image_name}}" ;;
+        bluefin-nvidia|nvidia)  ELEMENT="oci/bluefin-nvidia.bst"; FINAL_NAME="{{image_name}}-nvidia" ;;
+        *) echo "ERROR: unknown variant '{{variant}}' (expected: bluefin | bluefin-nvidia)" >&2; exit 1 ;;
     esac
     FINAL_TAG="{{image_tag}}"
 
@@ -232,17 +237,17 @@ bootc *ARGS:
         "{{image_name}}:{{image_tag}}" bootc {{ARGS}}
 
 # ── Generate bootable disk image ─────────────────────────────────────
-# Variant selects which loaded image to install (default | nvidia).
+# Variant selects which loaded image to install (bluefin | bluefin-nvidia).
 # Mirrors `just build` / `just export`'s tag scheme.
 [group('test')]
-generate-bootable-image variant="default" $base_dir=base_dir $filesystem=filesystem:
+generate-bootable-image variant="bluefin" $base_dir=base_dir $filesystem=filesystem:
     #!/usr/bin/env bash
     set -euo pipefail
 
     case "{{variant}}" in
-        default) FINAL_NAME="{{image_name}}" ;;
-        nvidia)  FINAL_NAME="{{image_name}}-nvidia" ;;
-        *) echo "ERROR: unknown variant '{{variant}}' (expected: default | nvidia)" >&2; exit 1 ;;
+        bluefin|default)        FINAL_NAME="{{image_name}}" ;;
+        bluefin-nvidia|nvidia)  FINAL_NAME="{{image_name}}-nvidia" ;;
+        *) echo "ERROR: unknown variant '{{variant}}' (expected: bluefin | bluefin-nvidia)" >&2; exit 1 ;;
     esac
 
     REF="${FINAL_NAME}:{{image_tag}}"
@@ -525,9 +530,9 @@ show-me-the-future:
     echo ""
 
     # ── Steps ─────────────────────────────────────────────────────
-    # Pinned to the `default` variant so we don't double the wall time
+    # Pinned to the `bluefin` variant so we don't double the wall time
     # building the nvidia variant the user never boots in this flow.
-    run_step "Build OCI image" just build default
+    run_step "Build OCI image" just build bluefin
     echo ""
     run_step "Bootable disk" just generate-bootable-image
     echo ""
@@ -692,7 +697,7 @@ _ensure-bcvk:
 # No disk image needed -- boots directly from the container via virtiofs.
 # Requires: bcvk, qemu-kvm, virtiofsd (sudo dnf install bcvk qemu-kvm virtiofsd)
 [group('test')]
-boot-fast: _ensure-bcvk
+boot-fast variant="bluefin": _ensure-bcvk
     #!/usr/bin/env bash
     set -euo pipefail
 
@@ -702,30 +707,37 @@ boot-fast: _ensure-bcvk
         SUDO_CMD="sudo"
     fi
 
-    if ! $SUDO_CMD podman image exists "{{image_name}}:{{image_tag}}"; then
-        echo "ERROR: Image '{{image_name}}:{{image_tag}}' not found in podman." >&2
-        echo "Run 'just build' first to build and export the OCI image." >&2
+    case "{{variant}}" in
+        bluefin|default)        FINAL_NAME="{{image_name}}" ;;
+        bluefin-nvidia|nvidia)  FINAL_NAME="{{image_name}}-nvidia" ;;
+        *) echo "ERROR: unknown variant '{{variant}}' (expected: bluefin | bluefin-nvidia)" >&2; exit 1 ;;
+    esac
+    REF="${FINAL_NAME}:{{image_tag}}"
+
+    if ! $SUDO_CMD podman image exists "$REF"; then
+        echo "ERROR: Image '$REF' not found in podman." >&2
+        echo "Run 'just build {{variant}}' first to build and export the OCI image." >&2
         exit 1
     fi
 
-    echo "==> Booting {{image_name}}:{{image_tag}} in ephemeral VM (bcvk)..."
+    echo "==> Booting ${REF} in ephemeral VM (bcvk)..."
     echo "    RAM: {{vm_ram}}M, CPUs: {{vm_cpus}}"
     echo "    No disk image -- boots directly via virtiofs"
     echo ""
     $SUDO_CMD bcvk ephemeral run-ssh \
         --memory "{{vm_ram}}M" \
         --vcpus "{{vm_cpus}}" \
-        "localhost/{{image_name}}:{{image_tag}}"
+        "localhost/${REF}"
 
 # Interactive debug session — boots the image, captures serial console and systemd
 # journal on exit. Artifacts are saved to ./debug-session/ for bug reports.
 # Requires: bcvk, qemu-kvm, virtiofsd
 [group('test')]
-debug-session: _ensure-bcvk
+debug-session variant="bluefin": _ensure-bcvk
     #!/usr/bin/env bash
     set -euo pipefail
 
-    VM_NAME="dakota-debug-$$"
+    VM_NAME="dudley-debug-$$"
     SESSION_DIR="./debug-session"
     START_TS=$(date +%s)
 
@@ -735,9 +747,16 @@ debug-session: _ensure-bcvk
         SUDO_CMD="sudo"
     fi
 
-    if ! $SUDO_CMD podman image exists "{{image_name}}:{{image_tag}}"; then
-        echo "ERROR: Image '{{image_name}}:{{image_tag}}' not found in podman." >&2
-        echo "Run 'just build' first to build and export the OCI image." >&2
+    case "{{variant}}" in
+        bluefin|default)        FINAL_NAME="{{image_name}}" ;;
+        bluefin-nvidia|nvidia)  FINAL_NAME="{{image_name}}-nvidia" ;;
+        *) echo "ERROR: unknown variant '{{variant}}' (expected: bluefin | bluefin-nvidia)" >&2; exit 1 ;;
+    esac
+    REF="${FINAL_NAME}:{{image_tag}}"
+
+    if ! $SUDO_CMD podman image exists "$REF"; then
+        echo "ERROR: Image '$REF' not found in podman." >&2
+        echo "Run 'just build {{variant}}' first to build and export the OCI image." >&2
         exit 1
     fi
 
@@ -762,7 +781,7 @@ debug-session: _ensure-bcvk
         fi
 
         {
-            echo "Debug session: {{image_name}}:{{image_tag}}"
+            echo "Debug session: ${REF}"
             echo "Duration: ${DURATION}s"
             echo "Kernel: ${KERNEL}"
             echo "Failed units: ${FAILED_DISPLAY}"
@@ -773,7 +792,7 @@ debug-session: _ensure-bcvk
             echo "  summary.txt  — this file"
             echo ""
             echo "Include these artifacts when filing an issue at:"
-            echo "  https://github.com/projectbluefin/dakota/issues/new?template=bug-report.yml"
+            echo "  https://github.com/joshyorko/dudley-factory/issues/new"
         } > "${SESSION_DIR}/summary.txt"
 
         echo ""
@@ -789,7 +808,7 @@ debug-session: _ensure-bcvk
         fi
         echo ""
         echo "File an issue with the artifacts above:"
-        echo "  https://github.com/projectbluefin/dakota/issues/new?template=bug-report.yml"
+        echo "  https://github.com/joshyorko/dudley-factory/issues/new"
 
         echo "==> Tearing down VM ${VM_NAME}..."
         $SUDO_CMD bcvk ephemeral rm -f "$VM_NAME" 2>/dev/null || true
@@ -798,7 +817,7 @@ debug-session: _ensure-bcvk
 
     mkdir -p "${SESSION_DIR}"
 
-    echo "==> debug-session: booting {{image_name}}:{{image_tag}} with serial capture..."
+    echo "==> debug-session: booting ${REF} with serial capture..."
     echo "    RAM: {{vm_ram}}M, CPUs: {{vm_cpus}}"
     echo "    Artifacts will be saved to ${SESSION_DIR}/"
     echo ""
@@ -809,7 +828,7 @@ debug-session: _ensure-bcvk
         --memory "{{vm_ram}}M" \
         --vcpus "{{vm_cpus}}" \
         --name "$VM_NAME" \
-        "localhost/{{image_name}}:{{image_tag}}"
+        "localhost/${REF}"
 
     # Wait for SSH to become available
     echo "==> Waiting for VM to boot..."
@@ -840,11 +859,11 @@ debug-session: _ensure-bcvk
 # Non-interactive. Intended for CI and agent verification loops.
 # Requires: bcvk, qemu-kvm, virtiofsd
 [group('test')]
-boot-test: _ensure-bcvk
+boot-test variant="bluefin": _ensure-bcvk
     #!/usr/bin/env bash
     set -euo pipefail
 
-    VM_NAME="dakota-boot-test-$$"
+    VM_NAME="dudley-boot-test-$$"
     TIMEOUT="${BOOT_TEST_TIMEOUT:-120}"
     STATUS=1
 
@@ -854,9 +873,16 @@ boot-test: _ensure-bcvk
         SUDO_CMD="sudo"
     fi
 
-    if ! $SUDO_CMD podman image exists "{{image_name}}:{{image_tag}}"; then
-        echo "ERROR: Image '{{image_name}}:{{image_tag}}' not found in podman." >&2
-        echo "Run 'just build' first to build and export the OCI image." >&2
+    case "{{variant}}" in
+        bluefin|default)        FINAL_NAME="{{image_name}}" ;;
+        bluefin-nvidia|nvidia)  FINAL_NAME="{{image_name}}-nvidia" ;;
+        *) echo "ERROR: unknown variant '{{variant}}' (expected: bluefin | bluefin-nvidia)" >&2; exit 1 ;;
+    esac
+    REF="${FINAL_NAME}:{{image_tag}}"
+
+    if ! $SUDO_CMD podman image exists "$REF"; then
+        echo "ERROR: Image '$REF' not found in podman." >&2
+        echo "Run 'just build {{variant}}' first to build and export the OCI image." >&2
         exit 1
     fi
 
@@ -871,7 +897,7 @@ boot-test: _ensure-bcvk
         --memory "{{vm_ram}}M" \
         --vcpus "{{vm_cpus}}" \
         --name "$VM_NAME" \
-        "localhost/{{image_name}}:{{image_tag}}"
+        "localhost/${REF}"
 
     # Wait for SSH to become available
     echo "==> Waiting for SSH..."
@@ -941,22 +967,22 @@ inspect: _ensure-bcvk
 # including GNOME/GTK/systemd from junctions (unlike syft which can only
 # fingerprint binaries in the rootfs and misses source-built packages).
 # Does NOT require a pre-built image — just the BST project files.
-# Output: dakota.spdx.json in repo root.
+# Output: dudley-bluefin.spdx.json in repo root.
 #
 # Local testing:
 #   just sbom                                # generate SBOM
-#   jq '.spdxVersion' dakota.spdx.json      # verify SPDX-2.3
-#   jq '.packages | length' dakota.spdx.json  # expect ~1100+
-#   jq -r '.packages[].name' dakota.spdx.json | grep -i "gnome\|gtk\|systemd"
+#   jq '.spdxVersion' dudley-bluefin.spdx.json      # verify SPDX-2.3
+#   jq '.packages | length' dudley-bluefin.spdx.json  # expect ~1100+
+#   jq -r '.packages[].name' dudley-bluefin.spdx.json | grep -i "gnome\|gtk\|systemd"
 [group('test')]
-sbom variant="default":
+sbom variant="bluefin":
     #!/usr/bin/env bash
     set -euo pipefail
 
     case "{{variant}}" in
-        default) ELEMENT="oci/bluefin.bst";        SPDX_NAME="dakota";        OUTFILE="dakota.spdx.json" ;;
-        nvidia)  ELEMENT="oci/bluefin-nvidia.bst"; SPDX_NAME="dakota-nvidia"; OUTFILE="dakota-nvidia.spdx.json" ;;
-        *) echo "ERROR: unknown variant '{{variant}}' (expected: default | nvidia)" >&2; exit 1 ;;
+        bluefin|default)        ELEMENT="oci/bluefin.bst";        SPDX_NAME="dudley-bluefin";        OUTFILE="dudley-bluefin.spdx.json" ;;
+        bluefin-nvidia|nvidia)  ELEMENT="oci/bluefin-nvidia.bst"; SPDX_NAME="dudley-bluefin-nvidia"; OUTFILE="dudley-bluefin-nvidia.spdx.json" ;;
+        *) echo "ERROR: unknown variant '{{variant}}' (expected: bluefin | bluefin-nvidia)" >&2; exit 1 ;;
     esac
 
     # Persist host-side caches before bind-mounting them into podman.
@@ -1012,9 +1038,9 @@ sbom variant="default":
             done
             buildstream-sbom "${ELEMENT}" \
                 --spdx-name "${SPDX_NAME}" \
-                --spdx-namespace "https://github.com/projectbluefin/dakota/sbom/${GIT_SHA}" \
+                --spdx-namespace "https://github.com/joshyorko/dudley-factory/sbom/${GIT_SHA}" \
                 --spdx-creator "Tool: buildstream-sbom" \
-                --spdx-creator "Organization: projectbluefin" \
+                --spdx-creator "Organization: joshyorko" \
                 --deps all \
                 --output "/src/${OUTFILE}"
         '
@@ -1029,14 +1055,14 @@ sbom variant="default":
 # Verify cosign signature + SBOM referrer + SLSA attestation for a
 # pushed image. Requires: cosign, oras, gh CLI.
 # Usage: just verify                           (uses IMAGE_REGISTRY/IMAGE_NAME:latest)
-#        just verify ghcr.io/projectbluefin/dakota:latest
+#        just verify ghcr.io/joshyorko/dudley-bluefin:testing
 [group('test')]
 verify image_ref="":
     #!/usr/bin/env bash
     set -euo pipefail
 
     IMAGE="{{image_ref}}"
-    [ -z "$IMAGE" ] && IMAGE="ghcr.io/projectbluefin/dakota:latest"
+    [ -z "$IMAGE" ] && IMAGE="ghcr.io/joshyorko/dudley-bluefin:testing"
 
     echo "==> Verifying supply-chain security for: ${IMAGE}"
     echo ""
@@ -1049,7 +1075,7 @@ verify image_ref="":
     else
         cosign verify \
             --certificate-identity-regexp \
-                '^https://github\.com/projectbluefin/dakota/\.github/workflows/publish\.yml@refs/heads/(main|gh-readonly-queue/main/.+)$' \
+                '^https://github\.com/joshyorko/dudley-factory/\.github/workflows/publish\.yml@refs/heads/(testing|main|gh-readonly-queue/(testing|main)/.+)$' \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
             "${IMAGE}" && echo "PASS: signature valid" || { echo "FAIL: signature check failed"; STATUS=1; }
     fi
@@ -1070,13 +1096,13 @@ verify image_ref="":
         echo "SKIP: gh not installed"
     else
         gh attestation verify "oci://${IMAGE}" \
-            --repo projectbluefin/dakota && echo "PASS: attestation valid" || { echo "FAIL: attestation check failed"; STATUS=1; }
+            --repo joshyorko/dudley-factory && echo "PASS: attestation valid" || { echo "FAIL: attestation check failed"; STATUS=1; }
     fi
     exit "${STATUS}"
 
 # ── Lint ─────────────────────────────────────────────────────────────
 [group('test')]
-lint:
+lint variant="bluefin":
     #!/usr/bin/env bash
     set -euo pipefail
 
@@ -1086,7 +1112,14 @@ lint:
         SUDO_CMD="sudo"
     fi
 
-    echo "==> Linting {{image_name}}:{{image_tag}} with bootc container lint..."
+    case "{{variant}}" in
+        bluefin|default)        FINAL_NAME="{{image_name}}" ;;
+        bluefin-nvidia|nvidia)  FINAL_NAME="{{image_name}}-nvidia" ;;
+        *) echo "ERROR: unknown variant '{{variant}}' (expected: bluefin | bluefin-nvidia)" >&2; exit 1 ;;
+    esac
+    REF="${FINAL_NAME}:{{image_tag}}"
+
+    echo "==> Linting ${REF} with bootc container lint..."
     $SUDO_CMD podman run --rm --privileged --pull=never \
-        "{{image_name}}:{{image_tag}}" \
+        "${REF}" \
         bootc container lint

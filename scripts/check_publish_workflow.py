@@ -5,6 +5,7 @@ import sys
 
 publish = Path('.github/workflows/publish.yml').read_text()
 install_defaults = Path('files/bootc-install/00-defaults.toml').read_text()
+BLUEFIN_SBOM = 'dudley-bluefin.spdx.json'
 
 match = re.search(
     r'- name: Install image to disk via bootc\n(?P<body>.*?)(?:\n\s*- name: |\n\s*# ──)',
@@ -49,11 +50,13 @@ if not sbom_match:
 else:
     sbom_body = sbom_match.group('body')
     default_continue = re.search(
-        r'- variant: default\n\s+element: oci/bluefin\.bst\n\s+image_suffix: \'\'\n\s+sbom_filename: dakota\.spdx\.json\n\s+continue: true',
+        r'- variant: bluefin\n\s+element: oci/bluefin\.bst\n\s+image_suffix: \'\'\n\s+sbom_filename: '
+        + re.escape(BLUEFIN_SBOM)
+        + r'\n\s+continue: true',
         sbom_body,
     )
     if not default_continue:
-        errors.append('publish-sbom default variant must stay continue-on-error via continue: true')
+        errors.append('publish-sbom bluefin variant must stay continue-on-error via continue: true')
     if 'continue-on-error: ${{ matrix.continue }}' not in sbom_body:
         errors.append('publish-sbom job must wire continue-on-error: ${{ matrix.continue }}')
 

@@ -1,98 +1,55 @@
-# Bluefin Dakota
-*Dakotaraptor steini*
+# Dudley Factory
 
-[Bluefin](https://projectbluefin.io) built on [GNOME OS](https://os.gnome.org/), assembled entirely from source.
+Dudley Factory is the BuildStream-based OS assembly repo for Dudley images.
+It is seeded from Project Bluefin Dakota's BuildStream model, but it is not the
+current production Dudley release path. The existing `dudley-os` Containerfile
+image remains production until these factory images boot and pass parity checks.
 
-<a href="https://docs.projectbluefin.io/changelogs">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://docs.projectbluefin.io/img/cards/dakota-dark.png">
-    <img src="https://docs.projectbluefin.io/img/cards/dakota-light.png" alt="Bluefin Dakota" width="800">
-  </picture>
-</a>
+## First Targets
 
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/projectbluefin/dakota)
-
-**Alpha** — [filing issues](https://github.com/projectbluefin/dakota/issues) is the whole point.
-
-## Built-in feedback loop
-
-Dakota doesn't eat tickets, it treats them as evidence.
-
-Every user running Dakota is part of a structured loop that flows directly back into upstream GNOME, freedesktop, and the kernel. When something breaks on your hardware, you have three commands:
-
-| Command | What it does |
-|---|---|
-| `ujust report` | Captures your system state and opens a pre-filled issue. One command instead of a wall of "please attach logs." |
-| `ujust confirm <issue>` | Tells the team your hardware hits the same bug. Adds a hardware fingerprint to the issue — no duplicate filing. |
-| `ujust verify <issue>` | After a fix ships in a nightly, confirms it works on your machine. Closes the loop with evidence. |
-
-No telemetry. No phone-home. Every report is reviewed by you before it leaves your machine, lives in a gist you own, and can be deleted anytime.
-
-When three users independently run `ujust verify` on a fix, that issue closes with real confidence — not just "we think this is fixed."
-
-### The hardware layer
-
-Each Dakota installation is designed to run as a hardware diagnostic lab for itself. When will you find your first?
-
-[Read the full feedback loop design](docs/feedback-loop.md)
-
-## The research behind it
-
-Dakota is human driven with contribution workflows for agents, so if you have tokens to donate, ask it to review issues or PRs, it's useful! The humans make the final decisions. We coordinate this project via a tool called [Hive](https://github.com/kubestellar/hive) from Kubestellar, a CNCF Sandbox project.
-
-Dakota's feedback loop model is grounded in Andy Anderson's work on autonomous AI-assisted software development. The core finding: the intelligence of a system like this lives not in any single model, but in the infrastructure of instructions, tests, metrics, and feedback loops surrounding it.
-
-- [The AI Codebase Maturity Model](https://arxiv.org/abs/2604.09388) — the arxiv paper
-- [When AI agents become contributors](https://www.cncf.io/blog/2026/05/14/when-ai-agents-become-contributors-how-kubestellar-reached-81-pr-acceptance/) — CNCF blog
-- [Beyond prompting: How KubeStellar reached 81% PR acceptance](https://thenewstack.io/ai-codebase-maturity-model/) — The New Stack
-- [KubeStellar Hive](https://github.com/kubestellar/hive) — the reference implementation Dakota draws from
-
-## Help shape what gets built
-
-**Architects and designers** — these features and epics need your input before any code is written. Design decisions, tradeoffs, and priorities:
-
-### [Open features and epics for discussion &rarr;](https://github.com/projectbluefin/dakota/issues?q=is%3Aopen+label%3Astatus%2Fdiscussing+label%3Atype%2Ffeature%2Ckind%2Fepic)
-
-Leave a comment, challenge the design, propose alternatives. When a discussion reaches consensus a maintainer marks it `status/approved` and it enters the build queue.
-
-**Engineers** — these issues have clear acceptance criteria and no open design questions. Pick one up and build it:
-
-### [Agent-ready build queue &rarr;](https://github.com/projectbluefin/dakota/issues?q=is%3Aopen+label%3Astatus%2Fqueued+no%3Aassignee)
-
-Comment `/claim` to take an issue. See [AGENTS.md](AGENTS.md) for the full contributor workflow.
-
-## Image streams
-
-| Tag | Stream | What it is |
+| Target | Image | Status |
 |---|---|---|
-| `:stable` | Stable | GNOME 50 — production. Daily automated promotion from `:testing`. |
-| `:testing` | Dev | GNOME 50 — daily builds from `testing` branch. Boot-check gated. |
-| `:next` | Rolling | **GNOME master — the bleeding edge.** Tracks gnome-build-meta `master` daily. Auto-updates, zero maintenance. |
-| `:btw` | Rolling | Alias for `:next`. |
+| Dudley Bluefin | `ghcr.io/joshyorko/dudley-bluefin:testing` | first factory target |
+| Dudley Bluefin NVIDIA | `ghcr.io/joshyorko/dudley-bluefin-nvidia:testing` | composes from Dudley Bluefin plus NVIDIA elements |
+| Dudley Ubuntu | `ghcr.io/joshyorko/dudley-ubuntu:experimental` | deferred feasibility track |
 
-`:next` / `:btw` is the arch competitor stream — latest GNOME the moment it lands upstream, built from source with memory-safe defaults (sudo-rs, uutils-coreutils). If you want to run GNOME before everyone else and help find regressions before they reach stable, this is your image.
+Stable tags are promotion targets only after the matching testing images boot,
+update, roll back, and pass parity checks.
+
+## Architecture
+
+- BuildStream owns OS assembly through `project.conf` and `elements/`.
+- The Containerfile remains only a bootc lint helper.
+- `dsb-common` owns the portable Dudley payload contract.
+- `elements/dudley/dsb-common-payload.bst` installs that payload by pinned git
+  source with `scripts/install-payload.py --profile bluefin`.
+- Final OCI assembly still runs Dakota's proven order: `prepare-image.sh`,
+  `systemd-sysusers`, `glib-compile-schemas`, `/etc` normalization,
+  `dconf update`, `ldconfig`, then `build-oci`.
+
+## Local Commands
 
 ```bash
-# Switch to the rolling stream
-sudo bootc switch ghcr.io/projectbluefin/dakota:next
-# or
-sudo bootc switch ghcr.io/projectbluefin/dakota:btw
+just validate
+BUILD_SKIP_NVIDIA=1 just build bluefin
+just boot-test bluefin
+just build bluefin-nvidia
+just boot-test bluefin-nvidia
 ```
 
-## ISO Download
+`bcvk` boot tests are the factory VM path. Keep the current `dudley-os`
+`bootc-image-builder` and QCOW2 flow as the comparison baseline until this repo
+proves parity.
 
-[dakota-live-latest.iso](https://projectbluefin.dev/dakota-live-latest.iso) · [Checksum](https://projectbluefin.dev/dakota-live-latest.iso-CHECKSUM)
+## Ubuntu Track
 
+Do not force Ubuntu through the Bluefin/GNOME/Freedesktop graph in v1. The first
+Ubuntu milestone is only: Dudley payload installs, bootc update semantics are
+feasible, and the image boots to SSH/systemd. Ubuntu remains experimental until
+install, update, rollback, and publishing paths are proven.
 
-## Known gaps
+## Chrome
 
-- Installation path is still being worked on
-- Upgrades and rollbacks need more hardening
-
-See the [open issues](https://github.com/projectbluefin/dakota/issues) for where things stand.
-
-## Contributing or building from source
-
-See [AGENTS.md](AGENTS.md) for the full contributor workflow, build instructions, and PR checklist.
-
-![Dakorator](https://github.com/user-attachments/assets/ee92291d-a617-496e-abb6-9045a4c665ce)
+Chrome is not installed through live `dnf` in BuildStream. Keep Chrome as a
+runtime/user payload until a pinned manual element exists with version and
+checksum control.

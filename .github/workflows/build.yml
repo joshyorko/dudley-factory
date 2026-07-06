@@ -1,4 +1,4 @@
-name: Build Bluefin dakota
+name: Build Dudley Bluefin
 
 on:
   # Fires daily at 13:00 UTC — 5 hours after the gnome-build-meta nightly
@@ -16,7 +16,7 @@ on:
 permissions: read-all
 
 env:
-  IMAGE_NAME: dakota
+  IMAGE_NAME: dudley-bluefin
   IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
 
 jobs:
@@ -59,7 +59,7 @@ jobs:
     # also serializes here. cancel-in-progress: false so an in-flight
     # build on one branch is never killed by a push to another branch.
     concurrency:
-      group: dakota-bst-build-global
+      group: dudley-bluefin-bst-build-global
       cancel-in-progress: false
     # Variants build serially — one BST build at a time per the hard rule.
     # Shared runners and CAS write bandwidth cannot sustain concurrent builds.
@@ -68,12 +68,12 @@ jobs:
       max-parallel: 1
       matrix:
         include:
-          - variant: default
+          - variant: bluefin
             element: oci/bluefin.bst
             image_suffix: ''
             publish: true
             continue: false
-          - variant: nvidia
+          - variant: bluefin-nvidia
             element: oci/bluefin-nvidia.bst
             image_suffix: '-nvidia'
             publish: true

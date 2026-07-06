@@ -28,7 +28,7 @@ on:
 # cancel-in-progress: false so a running build is never killed by a
 # scheduled dispatch.
 concurrency:
-  group: dakota-bst-build-global
+  group: dudley-bluefin-bst-build-global
   cancel-in-progress: false
 
 jobs:

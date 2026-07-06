@@ -10,7 +10,7 @@ Usage:
         --sha7     2294ec1 \
         --date     2026-05-14 \
         --tag      2026-05-14-2294ec1 \
-        --repo     projectbluefin/dakota \
+        --repo     joshyorko/dudley-factory \
         --output-light release-card-light.png \
         --output-dark  release-card-dark.png \
         --release-notes release-notes.md
@@ -26,7 +26,7 @@ from pathlib import Path
 
 # ── HTML card template ────────────────────────────────────────────────────────
 # Self-contained: no external resources, no web fonts.
-# Dakota accent: #7c3aed (purple), matching OsReleaseCard.module.css .cardDakota.
+# Dudley Factory accent: #7c3aed.
 # Rendered at 840 px wide; Playwright crops to .release-card bounding box.
 
 CARD_HTML = """\
@@ -231,7 +231,7 @@ body {{
 
   <div class="card-header">
     <div>
-      <div class="card-title">Bluefin Dakota</div>
+      <div class="card-title">Dudley Bluefin</div>
       <div class="card-meta">
         <span class="card-tag">{tag}</span>
         <span class="card-date">{date_long}</span>
@@ -246,8 +246,8 @@ body {{
 
 {diff_bar_html}
   <div class="card-footer">
-    <span class="image-ref">ghcr.io/projectbluefin/dakota:{sha7}</span>
-    <a href="https://docs.projectbluefin.io/changelogs">docs.projectbluefin.io/changelogs →</a>
+    <span class="image-ref">ghcr.io/joshyorko/dudley-bluefin:{sha7}</span>
+    <a href="https://github.com/joshyorko/dudley-factory/releases">Dudley Factory releases →</a>
   </div>
 
 </div>
@@ -351,7 +351,7 @@ def build_release_notes(
     date: str,
     repo: str,
 ) -> str:
-    image_ref   = f"ghcr.io/{repo.split('/')[0]}/dakota"
+    image_ref   = f"ghcr.io/{repo.split('/')[0]}/dudley-bluefin"
     cert_regexp = (
         rf"^https://github\.com/{repo}/\.github/workflows/publish\.yml"
         r"@refs/heads/(main|gh-readonly-queue/main/.+)$"
@@ -439,7 +439,7 @@ def build_release_notes(
 
     # Build lines with no leading whitespace — 4-space indent renders as code in GitHub MD
     L = [
-        f"![Bluefin Dakota {tag}](https://github.com/{repo}/releases/download/{tag}/release-card.png)",
+        f"![Dudley Bluefin {tag}](https://github.com/{repo}/releases/download/{tag}/release-card.png)",
         "",
         diff_line,
         "",
@@ -453,8 +453,8 @@ def build_release_notes(
         "## Images",
         "",
         "```",
-        f"ghcr.io/{repo.split('/')[0]}/dakota:latest",
-        f"ghcr.io/{repo.split('/')[0]}/dakota:{sha}",
+        f"ghcr.io/{repo.split('/')[0]}/dudley-bluefin:stable",
+        f"ghcr.io/{repo.split('/')[0]}/dudley-bluefin:{sha}",
         "```",
         "",
         "## Verify your image",
@@ -476,17 +476,17 @@ def build_release_notes(
         f"gh attestation verify oci://{image_ref}:{sha} \\",
         f"  --repo {repo}",
         "",
-        "# Or all three at once (requires dakota checkout):",
+        "# Or all three at once (requires dudley-factory checkout):",
         f"just verify {image_ref}:{sha}",
         "```",
         "",
         "## Supply chain",
         "",
-        f"- **SBOM (SPDX 2.3):** [`dakota.spdx.json`](https://github.com/{repo}/releases/download/{tag}/dakota.spdx.json) attached below",
+        f"- **SBOM (SPDX 2.3):** [`dudley-bluefin.spdx.json`](https://github.com/{repo}/releases/download/{tag}/dudley-bluefin.spdx.json) attached below",
         "- **Cosign:** keyless, Sigstore OIDC via GitHub Actions",
         f"- **SLSA provenance:** `gh attestation verify oci://{image_ref}:{sha} --repo {repo}`",
         "",
-        "Full changelog → https://docs.projectbluefin.io/changelogs",
+        f"Full changelog -> https://github.com/{repo}/releases",
     ]
     notes = "\n".join(L) + "\n"
 

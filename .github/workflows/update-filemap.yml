@@ -28,7 +28,7 @@ on:
         default: false
 
 concurrency:
-  group: dakota-bst-build-global
+  group: dudley-bluefin-bst-build-global
   cancel-in-progress: false
 
 permissions: read-all

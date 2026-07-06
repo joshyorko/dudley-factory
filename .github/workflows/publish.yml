@@ -1,9 +1,9 @@
-name: Publish Bluefin dakota
+name: Publish Dudley Bluefin
 
 on:
   workflow_dispatch:
   workflow_run:
-    workflows: ["Build Bluefin dakota"]
+    workflows: ["Build Dudley Bluefin"]
     types: [completed]
     branches:
       - next
@@ -12,7 +12,7 @@ on:
       - 'gh-readonly-queue/testing/**'
 
 env:
-  IMAGE_NAME: dakota
+  IMAGE_NAME: dudley-bluefin
   IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
 
 permissions:
@@ -83,22 +83,22 @@ jobs:
     needs: setup
     runs-on: ubuntu-24.04
     timeout-minutes: 90
-    # Variant matrix: default and NVIDIA publish in parallel from the shared
+    # Variant matrix: Bluefin and NVIDIA publish in parallel from the shared
     # BST artifact cache. NVIDIA is `continue-on-error: true` so its failure
-    # does not block default publication.
+    # does not block Bluefin publication.
     strategy:
       fail-fast: false
       matrix:
         include:
-          - variant: default
+          - variant: bluefin
             element: oci/bluefin.bst
             image_suffix: ''
-            sbom_filename: dakota.spdx.json
+            sbom_filename: dudley-bluefin.spdx.json
             continue: false
-          - variant: nvidia
+          - variant: bluefin-nvidia
             element: oci/bluefin-nvidia.bst
             image_suffix: '-nvidia'
-            sbom_filename: dakota-nvidia.spdx.json
+            sbom_filename: dudley-bluefin-nvidia.spdx.json
             continue: true
     continue-on-error: ${{ matrix.continue }}
     permissions:
@@ -200,7 +200,7 @@ jobs:
         uses: oras-project/setup-oras@38de303aac69abb66f3e6255b7198bff35f323e3 # v2.0.0
 
       - name: Sign image and create attestation
-        # generate-sbom: false — dakota uses just sbom (BST-native provenance via
+        # generate-sbom: false — Dudley uses just sbom (BST-native provenance via
         # bst artifact list). Syft post-build scan is less accurate for BST builds.
         # SBOM attachment and SBOM signing are handled in the publish-sbom job.
         uses: projectbluefin/actions/bootc-build/sign-and-publish@v1
@@ -541,15 +541,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - variant: default
+          - variant: bluefin
             element: oci/bluefin.bst
             image_suffix: ''
-            sbom_filename: dakota.spdx.json
+            sbom_filename: dudley-bluefin.spdx.json
             continue: true
-          - variant: nvidia
+          - variant: bluefin-nvidia
             element: oci/bluefin-nvidia.bst
             image_suffix: '-nvidia'
-            sbom_filename: dakota-nvidia.spdx.json
+            sbom_filename: dudley-bluefin-nvidia.spdx.json
             continue: true
     continue-on-error: ${{ matrix.continue }}
     permissions:
@@ -597,13 +597,13 @@ jobs:
         run: just sbom ${{ matrix.variant }}
 
       - name: Upload SBOM artifact for release workflow
-        if: matrix.variant == 'default'
-        run: cp dakota.spdx.json dakota.sbom.json
+        if: matrix.variant == 'bluefin'
+        run: cp dudley-bluefin.spdx.json dudley-bluefin.sbom.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: matrix.variant == 'default'
+        if: matrix.variant == 'bluefin'
         with:
-          name: sbom-dakota
-          path: dakota.sbom.json
+          name: sbom-dudley-bluefin
+          path: dudley-bluefin.sbom.json
           retention-days: 30
 
       - name: Login to GHCR
@@ -665,7 +665,7 @@ jobs:
   # saving the 20–25 min round-trip of the previous podman pull→tag→push approach.
   # --preserve-digests keeps the promoted tag pointing at the signed manifest digest.
   # NVIDIA is continue-on-error so a failing NVIDIA promote does not
-  # prevent the default :testing from landing.
+  # prevent the Bluefin :testing from landing.
   promote:
     needs: [setup, publish-image, boot-check]
     if: >-

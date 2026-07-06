@@ -50,7 +50,7 @@ body:
     id: context
     attributes:
       label: "Extra context"
-      description: "Optional. Known problem areas, related Dakota issues, or constraints the agent should respect."
+      description: "Optional. Known problem areas, related Dudley Factory issues, or constraints the agent should respect."
       placeholder: "Related to #503. The agent should not suggest changes that require a new external dependency."
     validations:
       required: false

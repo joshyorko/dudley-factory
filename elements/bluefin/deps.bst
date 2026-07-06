@@ -1,6 +1,5 @@
-# Historical path note: despite the directory name, this is Dakota's package
-# manifest. Add or remove image content via `.bst` elements here — never via
-# dnf/RPM/Containerfile overlay logic.
+# Historical path note: despite the directory name, this is the Dudley Bluefin
+# package manifest. Add or remove image content via `.bst` elements here.
 kind: stack
 
 depends:
@@ -22,6 +21,7 @@ depends:
   - bluefin/umotd.bst
 
   - bluefin/common.bst
+  - dudley/dsb-common-payload.bst
   - bluefin/just-overrides.bst
   - bluefin/firstboot-date.bst
   - bluefin/firstboot-services.bst

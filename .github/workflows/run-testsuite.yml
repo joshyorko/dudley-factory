@@ -7,7 +7,7 @@ on:
   workflow_call:
     inputs:
       image:
-        description: "Full image reference to test (e.g. ghcr.io/projectbluefin/dakota:testing)"
+        description: "Full image reference to test (e.g. ghcr.io/joshyorko/dudley-bluefin:testing)"
         required: true
         type: string
       suites:
@@ -30,4 +30,3 @@ jobs:
       image: ${{ inputs.image }}
       suites: ${{ inputs.suites }}
     secrets: inherit
-

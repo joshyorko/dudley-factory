@@ -45,12 +45,18 @@ jobs:
             exit 1
           fi
 
-      - name: Validate BST element graph (default)
+      - name: Validate Dudley factory contract
+        run: python3 -m unittest tests.test_factory_contract -v
+
+      - name: Validate publish workflow contract
+        run: python3 scripts/check_publish_workflow.py
+
+      - name: Validate BST element graph (Bluefin)
         env:
           BST_FLAGS: -o x86_64_v3 true --no-interactive
         run: just bst show --deps all oci/bluefin.bst
 
-      - name: Validate BST element graph (nvidia)
+      - name: Validate BST element graph (Bluefin NVIDIA)
         env:
           BST_FLAGS: -o x86_64_v3 true --no-interactive
         run: just bst show --deps all oci/bluefin-nvidia.bst

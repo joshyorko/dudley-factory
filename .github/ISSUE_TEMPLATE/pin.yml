@@ -4,7 +4,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thank you for taking the time to fill out this bug report! (She bites sometimes). We can pin packages to older, known working versions if there's an issue with an update in Fedora.
+        Thank you for taking the time to fill out this request. Dudley Factory can pin BuildStream sources or defer selected payload until an upstream regression is resolved.
   - type: textarea
     id: package
     attributes:
@@ -18,8 +18,8 @@ body:
     id: bodhi
     attributes:
       label: Bodhi Link (Optional)
-      description: Add the bodhi link to the working version, this is very useful in order to pin a package quickly
-      placeholder: Bodhi link
-      value: "Pin to this version please: https://bodhi.fedoraproject.org/updates/FEDORA-2024-45d587348e"
+      description: Add the upstream release, checksum, commit, or Bodhi link to the working version when available.
+      placeholder: Upstream release, checksum, commit, or Bodhi link
+      value: "Pin to this version please: https://example.com/project/releases/tag/v1.1"
     validations:
       required: false

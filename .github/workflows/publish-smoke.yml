@@ -5,7 +5,7 @@ name: Publish Smoke
 # turns flaky desktop assertions into a red publish pipeline.
 on:
   workflow_run:
-    workflows: ["Publish Bluefin dakota"]
+    workflows: ["Publish Dudley Bluefin"]
     types: [completed]
     branches:
       - main
@@ -24,6 +24,6 @@ jobs:
     if: github.event.workflow_run.conclusion == 'success'
     uses: ./.github/workflows/run-testsuite.yml
     with:
-      image: ghcr.io/${{ github.repository_owner }}/dakota:${{ github.event.workflow_run.head_sha }}
+      image: ghcr.io/${{ github.repository_owner }}/dudley-bluefin:${{ github.event.workflow_run.head_sha }}
       suites: smoke
     secrets: inherit

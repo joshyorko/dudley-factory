@@ -61,17 +61,17 @@ config:
         parent:
           image: /parent
         layer: /layer
-        comment: "Import Bluefin + NVIDIA layer"
+        comment: "Import Dudley Bluefin + NVIDIA layer"
         config:
           Labels:
             'com.github.containers.toolbox': 'true'
-            'org.opencontainers.image.title': 'Bluefin NVIDIA'
-            'org.opencontainers.image.description': 'A custom GNOME-based desktop image with NVIDIA proprietary driver'
-            'org.opencontainers.image.vendor': 'Project Bluefin'
+            'org.opencontainers.image.title': 'Dudley Bluefin NVIDIA'
+            'org.opencontainers.image.description': 'Dudley OS Bluefin factory image with NVIDIA proprietary driver'
+            'org.opencontainers.image.vendor': 'joshyorko'
             'org.opencontainers.image.licenses': 'Apache-2.0 AND LicenseRef-NVIDIA-SLA'
-            'org.opencontainers.image.url': 'https://projectbluefin.io'
-            'org.opencontainers.image.source': 'https://github.com/projectbluefin/dakota'
+            'org.opencontainers.image.url': 'https://github.com/joshyorko/dudley-factory'
+            'org.opencontainers.image.source': 'https://github.com/joshyorko/dudley-factory'
             'containers.bootc': '1'
         index-annotations:
-          'org.opencontainers.image.ref.name': 'ghcr.io/projectbluefin/dakota-nvidia:latest'
+          'org.opencontainers.image.ref.name': 'ghcr.io/joshyorko/dudley-bluefin-nvidia:testing'
       EOF

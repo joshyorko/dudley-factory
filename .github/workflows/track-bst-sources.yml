@@ -22,7 +22,7 @@ on:
 permissions: read-all
 
 concurrency:
-  group: dakota-bst-build-global
+  group: dudley-bluefin-bst-build-global
   cancel-in-progress: false
 
 env:

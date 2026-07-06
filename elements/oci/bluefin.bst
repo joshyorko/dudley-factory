@@ -70,17 +70,17 @@ config:
       - os: linux
         architecture: "%{go-arch}"
         layer: /layer
-        comment: "Import Bluefin layer"
+        comment: "Import Dudley Bluefin layer"
         config:
           Labels:
             'com.github.containers.toolbox': 'true'
-            'org.opencontainers.image.title': 'Bluefin'
-            'org.opencontainers.image.description': 'A custom GNOME-based desktop image'
-            'org.opencontainers.image.vendor': 'Project Bluefin'
+            'org.opencontainers.image.title': 'Dudley Bluefin'
+            'org.opencontainers.image.description': 'Dudley OS Bluefin factory image'
+            'org.opencontainers.image.vendor': 'joshyorko'
             'org.opencontainers.image.licenses': 'Apache-2.0'
-            'org.opencontainers.image.url': 'https://projectbluefin.io'
-            'org.opencontainers.image.source': 'https://github.com/projectbluefin/dakota'
+            'org.opencontainers.image.url': 'https://github.com/joshyorko/dudley-factory'
+            'org.opencontainers.image.source': 'https://github.com/joshyorko/dudley-factory'
             'containers.bootc': '1'
         index-annotations:
-          'org.opencontainers.image.ref.name': 'ghcr.io/projectbluefin/dakota:latest'
+          'org.opencontainers.image.ref.name': 'ghcr.io/joshyorko/dudley-bluefin:testing'
       EOF

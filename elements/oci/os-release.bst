@@ -9,21 +9,21 @@ variables:
 environment:
   # FIXME: configurable
   # IMAGE_REF="ostree-image-signed:docker://ghcr.io/${IMAGE_VENDOR}/${IMAGE_NAME}"
-  IMAGE_NAME: "dakota"
-  IMAGE_VENDOR: "projectbluefin"
-  IMAGE_REF: "ostree-image-signed:docker://ghcr.io/projectbluefin/dakota"
+  IMAGE_NAME: "dudley-bluefin"
+  IMAGE_VENDOR: "joshyorko"
+  IMAGE_REF: "ostree-image-signed:docker://ghcr.io/joshyorko/dudley-bluefin"
   IMAGE_FLAVOR: "main"
   IMAGE_TAG: "latest"
   VERSION_ID: "0"
   IMAGE_VERSION: "0"
 
-  IMAGE_PRETTY_NAME: "Bluefin"
-  HOME_URL: "https://projectbluefin.io"
-  DOCUMENTATION_URL: "https://docs.projectbluefin.io"
-  SUPPORT_URL: "https://github.com/projectbluefin/dakota/issues"
-  BUG_SUPPORT_URL: "https://github.com/projectbluefin/dakota/issues"
-  CODE_NAME: "Dakotaraptor"
-  ID: "bluefin-dakota"
+  IMAGE_PRETTY_NAME: "Dudley Bluefin"
+  HOME_URL: "https://github.com/joshyorko/dudley-factory"
+  DOCUMENTATION_URL: "https://github.com/joshyorko/dudley-factory"
+  SUPPORT_URL: "https://github.com/joshyorko/dudley-factory/issues"
+  BUG_SUPPORT_URL: "https://github.com/joshyorko/dudley-factory/issues"
+  CODE_NAME: "Dudley"
+  ID: "dudley-bluefin"
   # Fedora platform ID — update alongside the gnome-build-meta junction when
   # the Fedora base bumps. The countme script reads this at runtime to build
   # the Fedora metalink URL (repo=fedora-NN).

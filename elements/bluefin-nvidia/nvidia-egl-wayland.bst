@@ -27,7 +27,7 @@ sources:
 - kind: git_repo
   url: github:NVIDIA/egl-wayland.git
   track: '*'
-  ref: 1.1.9-0-gcd0d19aa2742b1318527cabbcf279fb651c45d30
+  ref: 1.1.21-0-gf81fcd016bb232c12ba59dddb240648203caaf4c
 
 variables:
   strip-binaries: ''

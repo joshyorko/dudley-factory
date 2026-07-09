@@ -26,6 +26,7 @@ export OCI_IMAGE_VERSION := env("OCI_IMAGE_VERSION", "latest")
 # Defaults to `-o x86_64_v3 true --no-interactive` so local runs match CI.
 # Set BST_FLAGS to append flags (e.g. --config ...).
 # Set BST_FLAGS_OVERRIDE to replace all default/appended flags.
+# Set BST_PODMAN_GLOBAL_ARGS to override podman storage/runtime flags.
 # Usage: just bst build oci/bluefin.bst
 #        just bst show oci/bluefin.bst
 #        BST_FLAGS="--config /src/buildstream-ci.conf" just bst build oci/bluefin.bst
@@ -34,6 +35,16 @@ bst *ARGS:
     #!/usr/bin/env bash
     set -euo pipefail
     mkdir -p "${HOME}/.cache/buildstream"
+    BST_PODMAN_GLOBAL_ARGS="${BST_PODMAN_GLOBAL_ARGS:-}"
+    if [ -z "${BST_PODMAN_GLOBAL_ARGS}" ] && [ -f /.dockerenv ]; then
+        BST_PODMAN_GLOBAL_ARGS="--storage-driver=vfs --root /tmp/podman-bst-root --runroot /tmp/podman-bst-runroot"
+    fi
+    BST_PODMAN_GLOBAL_ARGS_ARRAY=()
+    if [ -n "${BST_PODMAN_GLOBAL_ARGS}" ]; then
+        # shellcheck disable=SC2206
+        BST_PODMAN_GLOBAL_ARGS_ARRAY=(${BST_PODMAN_GLOBAL_ARGS})
+    fi
+
     DEFAULT_BST_FLAGS="-o x86_64_v3 true --no-interactive"
     if [ -n "${BST_FLAGS_OVERRIDE:-}" ]; then
         EFFECTIVE_BST_FLAGS="${BST_FLAGS_OVERRIDE}"
@@ -50,7 +61,7 @@ bst *ARGS:
     # BST_FLAGS allows appending --no-interactive, --config, etc.
     # Word-splitting is intentional here (flags are space-separated).
     # shellcheck disable=SC2086
-    podman run --rm \
+    podman "${BST_PODMAN_GLOBAL_ARGS_ARRAY[@]}" run --rm \
         --privileged \
         --device /dev/fuse \
         --network=host \
@@ -183,9 +194,9 @@ export variant="bluefin":
     echo "==> Export complete. Image loaded as ${FINAL_NAME}:${FINAL_TAG}"
     $SUDO_CMD podman images | grep -E "{{image_name}}|REPOSITORY" || true
 
-# Push exported image to a local zot registry for lab testing.
+# Push an exported image variant to a local zot registry for lab testing.
 [group('dev')]
-push-local registry="localhost:5000":
+push-local variant="bluefin" registry="localhost:5000":
     #!/usr/bin/env bash
     set -euo pipefail
 
@@ -194,12 +205,18 @@ push-local registry="localhost:5000":
         SUDO_CMD="sudo"
     fi
 
-    SOURCE_REF="{{image_name}}:{{image_tag}}"
-    TARGET_REF="{{registry}}/{{image_name}}:{{image_tag}}"
+    case "{{variant}}" in
+        bluefin|default)        FINAL_NAME="{{image_name}}" ;;
+        bluefin-nvidia|nvidia)  FINAL_NAME="{{image_name}}-nvidia" ;;
+        *) echo "ERROR: unknown variant '{{variant}}' (expected: bluefin | bluefin-nvidia)" >&2; exit 1 ;;
+    esac
+
+    SOURCE_REF="${FINAL_NAME}:{{image_tag}}"
+    TARGET_REF="{{registry}}/${FINAL_NAME}:{{image_tag}}"
 
     if ! $SUDO_CMD podman image exists "$SOURCE_REF"; then
         echo "ERROR: Image '$SOURCE_REF' not found in podman." >&2
-        echo "Run 'just export' first." >&2
+        echo "Run 'just export {{variant}}' first." >&2
         exit 1
     fi
 

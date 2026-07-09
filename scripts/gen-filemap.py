@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""gen-filemap.py — generate usr/lib/chunkah/filemap.json for the dakota image.
+"""gen-filemap.py — generate usr/lib/chunkah/filemap.json for a factory image.
 
 Queries the local BST artifact cache (via ``just bst``) to build an exact
 file → BST-element mapping across the entire dependency tree.  The output
 is written to ``files/filemap.json`` and baked into the OCI image as
 ``usr/lib/chunkah/filemap.json`` so chunkah can auto-detect it.
 
-Run from the dakota project root after ``just bst build oci/layers/bluefin.bst``.
+Run from the Dudley Factory project root after ``just bst build oci/layers/bluefin.bst``.
 
 Usage::
 

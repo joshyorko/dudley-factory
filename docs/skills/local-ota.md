@@ -85,16 +85,17 @@ just build
 just export
 
 # 3. Push to local registry
-just push-local localhost:5000          # QEMU path (host gateway = 10.0.2.2 from inside VM)
-just push-local <build-host-ip>:5000   # Physical hardware path
+just push-local bluefin localhost:5000              # QEMU path (host gateway = 10.0.2.2 from inside VM)
+just push-local bluefin-nvidia localhost:5000       # NVIDIA variant after it builds and boots
+just push-local bluefin <build-host-ip>:5000        # Physical hardware path
 
 # 4a. QEMU VM — boot a VM
 just boot-fast     # ephemeral VM via virtiofs (requires virtiofsd)
 just boot-vm       # standard QEMU VM with display
 
-# 5. On the test machine — switch to local registry (first time only)
-sudo bootc switch 10.0.2.2:5000/dakota:latest          # QEMU
-sudo bootc switch <build-host-ip>:5000/dakota:latest   # Physical
+# 5. On the test machine — switch only after the exact tag exists and boot tests pass
+sudo bootc switch 10.0.2.2:5000/dudley-bluefin:testing          # QEMU
+sudo bootc switch <build-host-ip>:5000/dudley-bluefin:testing   # Physical
 
 # 6. Subsequent upgrades
 sudo bootc upgrade
@@ -111,10 +112,15 @@ systemctl --failed               # check for failed units
 journalctl -p err --since boot   # check for boot errors
 ```
 
-## Reverting to GHCR
+## Switching to GHCR
 
 ```bash
-sudo bootc switch ghcr.io/projectbluefin/dakota:latest
+# Only after the exact tag exists and the image has passed boot testing.
+sudo bootc switch ghcr.io/joshyorko/dudley-bluefin:testing
+
+# NVIDIA variant, only after the exact tag exists and has passed boot testing.
+sudo bootc switch ghcr.io/joshyorko/dudley-bluefin-nvidia:testing
+
 sudo systemctl reboot
 ```
 
@@ -158,10 +164,10 @@ Do not use `--compression-format=zstd:chunked` for local registry pushes. It bre
 
 ```bash
 # Correct
-just push-local localhost:5000
+just push-local bluefin localhost:5000
 
 # Wrong — breaks composefs
-sudo podman push --compression-format=zstd:chunked localhost:5000/dakota:latest
+sudo podman push --compression-format=zstd:chunked localhost:5000/dudley-bluefin:testing
 ```
 
 ### bootc switch same-content trap
@@ -169,10 +175,10 @@ sudo podman push --compression-format=zstd:chunked localhost:5000/dakota:latest
 `bootc switch <tag>` silently does nothing if the tag resolves to the already-booted digest. Force the upgrade with the exact digest:
 
 ```bash
-DIGEST=$(curl -sI http://<zot-registry>/v2/dakota/manifests/<TAG> \
+DIGEST=$(curl -sI http://<zot-registry>/v2/dudley-bluefin/manifests/testing \
   -H 'Accept: application/vnd.oci.image.manifest.v1+json' \
   | grep -i docker-content-digest | awk '{print $2}' | tr -d '\r')
-sudo bootc switch --transport registry <zot-registry>/dakota@${DIGEST}
+sudo bootc switch --transport registry <zot-registry>/dudley-bluefin@${DIGEST}
 ```
 
 ### Assertions must execute — not just check file presence
